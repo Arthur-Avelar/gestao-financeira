@@ -8,178 +8,202 @@
 </head>
 <body>
 
-  <header class="cabecalho">
-    <h1>Gestão Financeira</h1>
-    <span class="mes-atual" id="mes-ano-topo">Setembro / 2026</span>
-  </header>
+  <div class="container">
+    <header>
+      <h1>Gestão Financeira</h1>
+      <nav class="nav-tabs">
+        <button class="tab-btn active" id="btn-resumo">📊 Resumo</button>
+        <button class="tab-btn" id="btn-extrato">📜 Extrato</button>
+        <button class="tab-btn" id="btn-novo">➕ Novo</button>
+        <button class="tab-btn" id="btn-fixas">📌 Fixas</button>
+        <button class="tab-btn" id="btn-futuros">🔮 Futuros</button>
+        <button class="tab-btn" id="btn-separados">🎯 Separados</button>
+        <button class="tab-btn" id="btn-calculadora">🧮 Calc</button>
+      </nav>
+    </header>
 
-  <main class="container">
-
-    <!-- ABA 1: RESUMO -->
-    <div id="aba-resumo" class="conteudo-aba ativa">
-      <!-- Card Saldo Real -->
-      <div class="card card-destaque-azul">
-        <small>💵 SALDO REAL EM CONTA (ENTRADAS - SAÍDAS)</small>
-        <h2 id="saldo-real-conta">R$ 0,00</h2>
+    <!-- ABA RESUMO -->
+    <section id="aba-resumo" class="aba-conteudo active">
+      <!-- DESTAQUE QUANTO POSSO GASTAR -->
+      <div class="card destaque-gasto">
+        <h3>Quanto Posso Gastar</h3>
+        <p id="quanto-posso-gastar">R$ 0,00</p>
       </div>
 
-      <!-- Card Disponível -->
-      <div class="card card-destaque-verde">
-        <small>🟢 DISPONÍVEL PARA GASTAR (C/ SEPARADOS E FUTUROS)</small>
-        <h2 id="saldo-para-gastar">R$ 0,00</h2>
-      </div>
-
-      <!-- Resumo Rápido -->
-      <div class="grid-resumo">
-        <div class="card-mini">
-          <small>💰 Entradas</small>
-          <strong id="total-entradas" class="txt-verde">R$ 0,00</strong>
+      <!-- GRID DE CARDS SECUNDÁRIOS -->
+      <div class="cards-grid">
+        <div class="card saldo">
+          <h3>Saldo Atual</h3>
+          <p id="saldo-total">R$ 0,00</p>
         </div>
-        <div class="card-mini">
-          <small>💸 Saídas</small>
-          <strong id="total-saidas" class="txt-vermelho">R$ 0,00</strong>
+        <div class="card futuro-card">
+          <h3>A Receber </h3>
+          <p id="total-futuros-card">R$ 0,00</p>
         </div>
-        <div class="card-mini">
-          <small>⏳ Dep. Futuros</small>
-          <strong id="total-futuros" class="txt-azul">+ R$ 0,00</strong>
+        <div class="card receita">
+          <h3>Entradas</h3>
+          <p id="total-entradas">R$ 0,00</p>
         </div>
-        <div class="card-mini">
-          <small>🔒 Separados</small>
-          <strong id="total-separados" class="txt-laranja">- R$ 0,00</strong>
+        <div class="card despesa">
+          <h3>Saídas</h3>
+          <p id="total-saidas">R$ 0,00</p>
         </div>
-      </div>
-
-      <!-- Gastos por Categoria -->
-      <section class="secao-box">
-        <h3>📊 Gastos por Categoria</h3>
-        <div id="lista-categorias" class="lista-simples"></div>
-      </section>
-    </div>
-
-    <!-- ABA 2: CONTAS FIXAS -->
-    <div id="aba-fixas" class="conteudo-aba">
-      <h3>📌 Contas Fixas do Mês</h3>
-
-      <!-- Painel Resumo de Fixas -->
-      <div class="painel-fixas">
-        <div class="linha-painel">
-          <span>Total de Contas:</span>
-          <strong id="total-contas-fixas">R$ 0,00</strong>
-        </div>
-        <div class="linha-painel txt-vermelho">
-          <span>Restante a Pagar:</span>
-          <strong id="restante-contas-fixas">R$ 0,00</strong>
-        </div>
-        <div class="linha-painel txt-verde">
-          <span>Total Já Pago:</span>
-          <strong id="pago-contas-fixas">R$ 0,00</strong>
+        <div class="card reservado">
+          <h3>Total Separado</h3>
+          <p id="total-separado">R$ 0,00</p>
         </div>
       </div>
 
-      <!-- Form Conta Fixa -->
-      <form id="form-conta-fixa" class="form-box">
-        <label>Nome da Conta:</label>
-        <input type="text" id="fixa-nome" placeholder="Ex: Aluguel, Luz, Internet..." required />
-        
-        <label>Valor (R$):</label>
-        <input type="number" step="0.01" id="fixa-valor" placeholder="0,00" required />
-        
-        <label>Dia de Vencimento (1 a 31):</label>
-        <input type="number" id="fixa-vencimento" min="1" max="31" placeholder="Ex: 10" required />
+      <div class="secao-categorias">
+        <h2>Gastos por Categoria</h2>
+        <div id="lista-categorias-resumo" class="lista-items"></div>
+      </div>
+    </section>
 
-        <button type="submit" class="btn-primario">+ Adicionar Conta Fixa</button>
-      </form>
+    <!-- ABA EXTRATO -->
+    <section id="aba-extrato" class="aba-conteudo">
+      <h2>Extrato de Transações</h2>
+      <div id="lista-extrato" class="lista-items"></div>
+    </section>
 
-      <!-- Lista de Contas Fixas -->
-      <section class="secao-box">
-        <h3>📋 Minhas Contas</h3>
-        <div id="lista-contas-fixas" class="lista-simples"></div>
-      </section>
-    </div>
-
-    <!-- ABA 3: SEPARADOS / RESERVAS -->
-    <div id="aba-separados" class="conteudo-aba">
-      <h3>🔒 Valores Reservados / Separados</h3>
-
-      <form id="form-separado" class="form-box">
-        <label>Motivo / Nome:</label>
-        <input type="text" id="sep-desc" placeholder="Ex: IPVA, Viagem, Emergência" required />
-        
-        <label>Valor Guardado (R$):</label>
-        <input type="number" step="0.01" id="sep-valor" placeholder="0,00" required />
-        
-        <button type="submit" class="btn-primario">+ Guardar Valor</button>
-      </form>
-
-      <section class="secao-box">
-        <h3>Itens Separados</h3>
-        <div id="lista-separados" class="lista-simples"></div>
-      </section>
-    </div>
-
-    <!-- ABA 4: NOVO LANÇAMENTO / CATEGORIAS -->
-    <div id="aba-novo" class="conteudo-aba">
-      <h3 id="titulo-form-lancamento">🛒 Registrar Lançamento</h3>
-
-      <form id="form-lancamento" class="form-box">
-        <input type="hidden" id="edit-id" value="" />
-
-        <label>Descrição (Opcional):</label>
-        <input type="text" id="desc" placeholder="Ex: Almoço, Uber, Mercado..." />
-
-        <label>Valor (R$):</label>
-        <input type="number" step="0.01" id="valor" placeholder="0,00" required />
-
-        <label>Data:</label>
-        <input type="date" id="data" required />
-
-        <label>Tipo:</label>
-        <select id="tipo">
-          <option value="saida">💸 Saída (Gasto)</option>
-          <option value="entrada">💰 Entrada (Ganho)</option>
-          <option value="futuro">⏳ Depósito Futuro</option>
-        </select>
-
-        <label>Categoria:</label>
-        <div style="display: flex; gap: 8px;">
-          <select id="categoria" style="flex: 1;"></select>
-          <button type="button" onclick="removerCategoriaSelecionada()" class="btn-perigo" title="Apagar categoria selecionada">🗑️</button>
+    <!-- ABA NOVO LANÇAMENTO & GERENCIAR CATEGORIAS -->
+    <section id="aba-novo" class="aba-conteudo">
+      <h2 id="titulo-form-lancamento">Novo Lançamento</h2>
+      <form id="form-lancamento">
+        <input type="hidden" id="edit-lancamento-id">
+        <div class="form-group">
+          <label for="desc">Descrição</label>
+          <input type="text" id="desc" placeholder="Ex: Mercado, Salário (Opcional)">
         </div>
-
-        <button type="submit" id="btn-submit-lancamento" class="btn-primario">Adicionar Lançamento</button>
-        <button type="button" id="btn-cancelar-edicao" onclick="cancelarEdicao()" class="btn-secundario" style="display: none;">Cancelar Edição</button>
+        <div class="form-group">
+          <label for="valor">Valor (R$)</label>
+          <input type="number" id="valor" step="0.01" required placeholder="0,00">
+        </div>
+        <div class="form-group">
+          <label for="tipo">Tipo</label>
+          <select id="tipo" required>
+            <option value="receita">Entrada (Receita)</option>
+            <option value="despesa">Saída (Despesa)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="categoria-select">Categoria</label>
+          <select id="categoria-select" required></select>
+        </div>
+        <div class="form-group">
+          <label for="data">Data</label>
+          <input type="date" id="data" required>
+        </div>
+        <button type="submit" class="btn-primary" id="btn-salvar-lancamento">Salvar Lançamento</button>
+        <button type="button" class="btn-cancelar" id="btn-cancelar-edicao" style="display:none;">Cancelar Edição</button>
       </form>
 
-      <hr style="margin: 25px 0; border: 0; border-top: 1px solid #e2e8f0;" />
+      <hr class="divisor">
 
-      <h3>🏷️ Cadastrar Nova Categoria</h3>
-      <form id="form-nova-categoria" class="form-box">
-        <input type="text" id="nova-cat-nome" placeholder="Ex: 🎮 Jogos, 🐾 Pet" required />
-        <button type="submit" class="btn-secundario">+ Criar Categoria</button>
+      <div class="secao-gerenciar-categorias">
+        <h2>Gerenciar Categorias</h2>
+        <form id="form-categoria">
+          <div class="form-row">
+            <input type="text" id="categoria-nome" placeholder="Nova Categoria (ex: Transporte)" required>
+            <button type="submit" class="btn-primary">Criar</button>
+          </div>
+        </form>
+        <div id="lista-categorias-gerenciador" class="lista-items"></div>
+      </div>
+    </section>
+
+    <!-- ABA CONTAS FIXAS -->
+    <section id="aba-fixas" class="aba-conteudo">
+      <h2>Contas Fixas</h2>
+
+      <!-- PAINEL DE TOTAL DE CONTAS FIXAS -->
+      <div class="cards-grid" style="margin-bottom: 20px;">
+        <div class="card despesa">
+          <h3>Total de Contas Fixas</h3>
+          <p id="total-fixas-valor">R$ 0,00</p>
+          <small id="total-fixas-qtd" style="color: #aaa; display: block; margin-top: 5px;">0 contas (0 pendentes)</small>
+        </div>
+      </div>
+
+      <form id="form-fixa">
+        <div class="form-row">
+          <input type="text" id="fixa-nome" placeholder="Nome da conta" required>
+          <input type="number" id="fixa-valor" step="0.01" placeholder="Valor" required>
+          <input type="number" id="fixa-vencimento" min="1" max="31" placeholder="Dia Venc." required>
+          <button type="submit" class="btn-primary">Adicionar</button>
+        </div>
       </form>
-    </div>
+      <div id="lista-fixas" class="lista-items"></div>
+    </section>
 
-    <!-- ABA 5: EXTRATO -->
-    <div id="aba-extrato" class="conteudo-aba">
-      <h3>📜 Extrato Completo</h3>
-      <div id="lista-lancamentos" class="lista-simples"></div>
-    </div>
+    <!-- ABA ENTRADAS/DEPÓSITOS FUTUROS -->
+    <section id="aba-futuros" class="aba-conteudo">
+      <h2>Depósitos / Entradas Futuras</h2>
+      <form id="form-futuro">
+        <div class="form-group">
+          <label for="futuro-desc">Descrição</label>
+          <input type="text" id="futuro-desc" placeholder="Ex: Salário, PIX de amigo" required>
+        </div>
+        <div class="form-group">
+          <label for="futuro-valor">Valor (R$)</label>
+          <input type="number" id="futuro-valor" step="0.01" placeholder="0,00" required>
+        </div>
+        <div class="form-group">
+          <label for="futuro-data">Data Prevista</label>
+          <input type="date" id="futuro-data" required>
+        </div>
+        <button type="submit" class="btn-primary">Agendar Entrada</button>
+      </form>
+      <div id="lista-futuros" class="lista-items"></div>
+    </section>
 
-  </main>
+    <!-- ABA VALORES SEPARADOS -->
+    <section id="aba-separados" class="aba-conteudo">
+      <h2>Fundos Separados / Objetivos</h2>
+      <form id="form-separado">
+        <div class="form-row">
+          <input type="text" id="separado-nome" placeholder="Objetivo (ex: Reserva)" required>
+          <input type="number" id="separado-valor" step="0.01" placeholder="Valor Guardado" required>
+          <button type="submit" class="btn-primary">Adicionar</button>
+        </div>
+      </form>
+      <div id="lista-separados" class="lista-items"></div>
+    </section>
 
-  <!-- NAV BOTTOM -->
-  <nav class="nav-bottom">
-    <button id="btn-nav-resumo" class="nav-btn ativo" onclick="mudarAba('aba-resumo', this)">📊 Resumo</button>
-    <button class="nav-btn" onclick="mudarAba('aba-fixas', this)">📌 Fixas</button>
-    <button class="nav-btn" onclick="mudarAba('aba-separados', this)">🔒 Separados</button>
-    <button id="btn-nav-novo" class="nav-btn" onclick="mudarAba('aba-novo', this)">➕ Novo</button>
-    <button class="nav-btn" onclick="mudarAba('aba-extrato', this)">📜 Extrato</button>
-  </nav>
+    <!-- ABA CALCULADORA -->
+    <section id="aba-calculadora" class="aba-conteudo">
+      <h2>Calculadora Rápida</h2>
+      <div class="calc-container">
+        <input type="text" id="calc-display" readonly value="0">
+        <div class="calc-grid">
+          <button class="btn-calc btn-op" id="calc-c">C</button>
+          <button class="btn-calc btn-op" id="calc-back">⌫</button>
+          <button class="btn-calc btn-op calc-num" data-val="/">÷</button>
+          <button class="btn-calc btn-op calc-num" data-val="*">×</button>
+          
+          <button class="btn-calc calc-num" data-val="7">7</button>
+          <button class="btn-calc calc-num" data-val="8">8</button>
+          <button class="btn-calc calc-num" data-val="9">9</button>
+          <button class="btn-calc btn-op calc-num" data-val="-">-</button>
+          
+          <button class="btn-calc calc-num" data-val="4">4</button>
+          <button class="btn-calc calc-num" data-val="5">5</button>
+          <button class="btn-calc calc-num" data-val="6">6</button>
+          <button class="btn-calc btn-op calc-num" data-val="+">+</button>
+          
+          <button class="btn-calc calc-num" data-val="1">1</button>
+          <button class="btn-calc calc-num" data-val="2">2</button>
+          <button class="btn-calc calc-num" data-val="3">3</button>
+          <button class="btn-calc btn-igual" id="calc-eq" style="grid-row: span 2">=</button>
+          
+          <button class="btn-calc calc-num" data-val="0" style="grid-column: span 2">0</button>
+          <button class="btn-calc calc-num" data-val=".">.</button>
+        </div>
+      </div>
+    </section>
 
-  <!-- BIBLIOTECAS DO FIREBASE (COMPAT) -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  </div>
 
-  <script src="script.js"></script>
+  <script type="module" src="script.js"></script>
 </body>
 </html>

@@ -2,232 +2,239 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 body {
-  background-color: #f8fafc;
-  color: #1e293b;
-  padding-bottom: 70px;
-}
-
-.cabecalho {
-  background: #0f172a;
-  color: #fff;
-  padding: 15px 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.cabecalho h1 {
-  font-size: 1.2rem;
-}
-
-.mes-atual {
-  font-size: 0.85rem;
-  color: #94a3b8;
+  background-color: #121212;
+  color: #e0e0e0;
+  padding: 20px;
 }
 
 .container {
-  padding: 15px;
-  max-width: 600px;
+  max-width: 800px;
   margin: 0 auto;
 }
 
-.conteudo-aba {
-  display: none;
+header {
+  margin-bottom: 20px;
 }
 
-.conteudo-aba.ativa {
+h1, h2 {
+  margin-bottom: 15px;
+  color: #ffffff;
+}
+
+.nav-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+}
+
+.tab-btn {
+  background: #2a2a2a;
+  color: #ccc;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 0.95rem;
+}
+
+.tab-btn.active {
+  background: #3b82f6;
+  color: #fff;
+  font-weight: bold;
+}
+
+.aba-conteudo {
+  display: none;
+  background: #1e1e1e;
+  padding: 20px;
+  border-radius: 12px;
+}
+
+.aba-conteudo.active {
   display: block;
+}
+
+/* DESTAQUE PRINCIPAL QUANTO POSSO GASTAR */
+.card.destaque-gasto {
+  background: #1e293b;
+  border: 2px solid #3b82f6;
+  text-align: center;
+  padding: 24px;
+  margin-bottom: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.card.destaque-gasto h3 {
+  font-size: 1.1rem;
+  color: #94a3b8;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.card.destaque-gasto p {
+  font-size: 2.6rem;
+  font-weight: bold;
+  color: #38bdf8;
+}
+
+/* CARDS SECUNDÁRIOS */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
 .card {
-  border-radius: 12px;
-  padding: 16px;
-  color: white;
-  margin-bottom: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-}
-
-.card-destaque-azul {
-  background: #1e293b;
-}
-
-.card-destaque-verde {
-  background: #10b981;
-}
-
-.card h2 {
-  font-size: 1.8rem;
-  margin-top: 5px;
-}
-
-.grid-resumo {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 15px;
-}
-
-.card-mini {
-  background: white;
-  padding: 12px;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-
-.card-mini strong {
-  display: block;
-  font-size: 1.1rem;
-  margin-top: 4px;
-}
-
-.txt-verde { color: #10b981; }
-.txt-vermelho { color: #ef4444; }
-.txt-azul { color: #0284c7; }
-.txt-laranja { color: #f59e0b; }
-
-.secao-box {
-  background: white;
   padding: 15px;
   border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-  margin-bottom: 15px;
+  background: #282828;
 }
 
-.secao-box h3 {
-  font-size: 1rem;
-  margin-bottom: 12px;
-  color: #334155;
-}
-
-.painel-fixas {
-  background: #1e293b;
-  padding: 15px;
-  border-radius: 10px;
-  margin-bottom: 15px;
-  color: white;
-}
-
-.linha-painel {
-  display: flex;
-  justify-content: space-between;
+.card h3 {
+  font-size: 0.85rem;
+  color: #aaa;
   margin-bottom: 8px;
 }
 
-.linha-painel:last-child {
-  margin-bottom: 0;
+.card p {
+  font-size: 1.25rem;
+  font-weight: bold;
 }
 
-.form-box {
-  background: white;
-  padding: 15px;
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+.card.saldo p { color: #60a5fa; }
+.card.futuro-card p { color: #c084fc; }
+.card.receita p { color: #4ade80; }
+.card.despesa p { color: #f87171; }
+.card.reservado p { color: #facc15; }
+
+.secao-categorias {
+  margin-top: 20px;
+  border-top: 1px solid #333;
+  padding-top: 15px;
+}
+
+.divisor {
+  border: none;
+  border-top: 1px solid #333;
+  margin: 25px 0;
+}
+
+.form-group, .form-row {
+  margin-bottom: 15px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-bottom: 15px;
+  gap: 5px;
 }
 
-.form-box label {
-  font-size: 0.85rem;
-  font-weight: bold;
-  color: #475569;
+.form-row {
+  flex-direction: row;
+  gap: 10px;
 }
 
 input, select {
-  width: 100%;
   padding: 10px;
-  border: 1px solid #cbd5e1;
   border-radius: 6px;
+  border: 1px solid #444;
+  background: #2a2a2a;
+  color: #fff;
   font-size: 1rem;
+  width: 100%;
 }
 
-.btn-primario {
-  background: #0284c7;
-  color: white;
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
   border: none;
-  padding: 12px;
+  padding: 10px 15px;
   border-radius: 6px;
+  cursor: pointer;
   font-weight: bold;
-  cursor: pointer;
 }
 
-.btn-secundario {
-  background: #64748b;
-  color: white;
+.btn-cancelar {
+  background: #4b5563;
+  color: #fff;
   border: none;
-  padding: 10px;
-  border-radius: 6px;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-.btn-perigo {
-  background: #ef4444;
-  color: white;
-  border: none;
-  padding: 10px 14px;
+  padding: 10px 15px;
   border-radius: 6px;
   cursor: pointer;
-}
-
-.lista-simples .item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.lista-simples .item-cat {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 0;
-  border-bottom: 1px dashed #e2e8f0;
-}
-
-.item-acoes {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  margin-top: 8px;
 }
 
 .btn-editar, .btn-excluir {
-  background: none;
+  background: transparent;
   border: none;
   cursor: pointer;
-  font-size: 1.1rem;
+  font-size: 1rem;
+  margin-left: 6px;
 }
 
-.nav-bottom {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: white;
-  display: flex;
-  justify-content: space-around;
-  padding: 8px 0;
-  border-top: 1px solid #e2e8f0;
-}
-
-.nav-btn {
-  background: none;
-  border: none;
-  font-size: 0.75rem;
-  color: #64748b;
-  cursor: pointer;
+.lista-items {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
+  gap: 10px;
+  margin-top: 15px;
 }
 
-.nav-btn.ativo {
-  color: #0284c7;
-  font-weight: bold;
+.item-lista {
+  background: #2a2a2a;
+  padding: 12px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
+
+.item-lista.receita { border-left: 4px solid #4ade80; }
+.item-lista.despesa { border-left: 4px solid #f87171; }
+.item-pago { opacity: 0.5; text-decoration: line-through; }
+
+/* CALCULADORA */
+.calc-container {
+  max-width: 300px;
+  margin: 0 auto;
+  background: #282828;
+  padding: 15px;
+  border-radius: 12px;
+}
+
+#calc-display {
+  width: 100%;
+  height: 50px;
+  background: #121212;
+  color: #fff;
+  font-size: 1.8rem;
+  text-align: right;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  margin-bottom: 15px;
+}
+
+.calc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.btn-calc {
+  padding: 15px;
+  font-size: 1.2rem;
+  border: none;
+  border-radius: 8px;
+  background: #3a3a3a;
+  color: #fff;
+  cursor: pointer;
+}
+
+.btn-op { background: #3b82f6; }
+.btn-igual { background: #22c55e; }

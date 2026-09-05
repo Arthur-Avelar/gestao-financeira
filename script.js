@@ -1,372 +1,457 @@
-// CONFIGURAÇÃO DO FIREBASE COM AS SUAS CREDENCIAIS REAIS
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
 const firebaseConfig = {
-  apiKey: "AIzaSyAoyYqQ0CRJKFPB7GjbEC0Bp_TrY7zWxs0",
-  authDomain: "minhas-finan-7e212.firebaseapp.com",
-  projectId: "minhas-finan-7e212",
-  storageBucket: "minhas-finan-7e212.firebasestorage.app",
-  messagingSenderId: "134299617081",
-  appId: "1:134299617081:web:1024238d910eac2f9ecae8",
-  measurementId: "G-YER58ZQ7M0"
+  projectId: "minhas-finan-7e212"
 };
 
-if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
-}
-const db = firebase.firestore();
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-// ESTADO DA APLICAÇÃO
+// Estado dos Dados
 let lancamentos = [];
 let contasFixas = [];
-let separados = [];
-let categorias = ["Alimentação", "Transporte", "Moradia", "Lazer", "Outros"];
+let valoresSeparados = [];
+let categorias = [];
+let entradasFuturas = [];
 
-// CARREGAR DADOS DO FIREBASE
-function carregarDados() {
-  db.collection("financeiro").doc("dados").onSnapshot((doc) => {
-    if (doc.exists) {
-      const data = doc.data();
-      lancamentos = data.lancamentos || [];
-      contasFixas = data.contasFixas || [];
-      separados = data.separados || [];
-      if (data.categorias && data.categorias.length > 0) {
-        categorias = data.categorias;
-      }
-    }
-    atualizarInterface();
-  });
+// Formatação BRL (Exemplo: R$ 1.000,00)
+const formatarMoeda = (valor) => {
+  return (valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+};
+
+// --- NAVEGAÇÃO DE ABAS ---
+function trocarAba(abaId, btn) {
+  document.querySelectorAll('.aba-conteudo').forEach(aba => aba.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+
+  document.getElementById(`aba-${abaId}`).classList.add('active');
+  btn.classList.add('active');
 }
 
-function salvarDados() {
-  db.collection("financeiro").doc("dados").set({
-    lancamentos,
-    contasFixas,
-    separados,
-    categorias
-  });
-}
+document.getElementById('btn-resumo').addEventListener('click', (e) => trocarAba('resumo', e.target));
+document.getElementById('btn-extrato').addEventListener('click', (e) => trocarAba('extrato', e.target));
+document.getElementById('btn-novo').addEventListener('click', (e) => trocarAba('novo', e.target));
+document.getElementById('btn-fixas').addEventListener('click', (e) => trocarAba('fixas', e.target));
+document.getElementById('btn-futuros').addEventListener('click', (e) => trocarAba('futuros', e.target));
+document.getElementById('btn-separados').addEventListener('click', (e) => trocarAba('separados', e.target));
+document.getElementById('btn-calculadora').addEventListener('click', (e) => trocarAba('calculadora', e.target));
 
-// NAVEGAÇÃO DE ABAS
-function mudarAba(idAba, elementoBtn) {
-  document.querySelectorAll('.conteudo-aba').forEach(aba => aba.classList.remove('ativa'));
-  document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('ativo'));
-  
-  document.getElementById(idAba).classList.add('ativa');
-  if (elementoBtn) elementoBtn.classList.add('ativo');
-}
-
-// ATUALIZAÇÃO GERAL DA INTERFACE
-function atualizarInterface() {
-  renderizarCategoriasSelect();
-  renderizarResumo();
-  renderizarContasFixas();
-  renderizarSeparados();
+// --- LISTENERS FIRESTORE (Tempo Real) ---
+onSnapshot(collection(db, "lancamentos"), (snapshot) => {
+  lancamentos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  atualizarResumo();
   renderizarExtrato();
+});
+
+onSnapshot(collection(db, "contasFixas"), (snapshot) => {
+  contasFixas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  atualizarResumo();
+  renderizarFixas();
+});
+
+onSnapshot(collection(db, "valoresSeparados"), (snapshot) => {
+  valoresSeparados = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  atualizarResumo();
+  renderizarSeparados();
+});
+
+onSnapshot(collection(db, "categorias"), (snapshot) => {
+  categorias = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  renderizarDropdownCategorias();
+  renderizarGerenciadorCategorias();
+  atualizarResumo();
+});
+
+onSnapshot(collection(db, "entradasFuturas"), (snapshot) => {
+  entradasFuturas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  renderizarFuturos();
+  atualizarResumo();
+});
+
+// --- RESUMO & QUANTO POSSO GASTAR ---
+function atualizarResumo() {
+  const entradas = lancamentos.filter(l => l.tipo === "receita").reduce((acc, l) => acc + (parseFloat(l.valor) || 0), 0);
+  const saidas = lancamentos.filter(l => l.tipo === "despesa").reduce((acc, l) => acc + (parseFloat(l.valor) || 0), 0);
+  const separado = valoresSeparados.reduce((acc, s) => acc + (parseFloat(s.valor) || 0), 0);
+  
+  const fixasPendentes = contasFixas.filter(f => !f.paga).reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
+  const totalFuturos = entradasFuturas.reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
+
+  // 1. Saldo Atual: Apenas Entradas - Saídas (NÃO desconta o separado)
+  const saldo = entradas - saidas;
+
+  // 2. Quanto Posso Gastar: (Saldo Real + Futuros) - Separado - Fixas Pendentes
+  const quantoPossoGastar = (saldo + totalFuturos) - separado - fixasPendentes;
+
+  // Atualização dos elementos na tela
+  document.getElementById("quanto-posso-gastar").innerText = formatarMoeda(quantoPossoGastar);
+  document.getElementById("saldo-total").innerText = formatarMoeda(saldo);
+  document.getElementById("total-futuros-card").innerText = formatarMoeda(totalFuturos);
+  document.getElementById("total-entradas").innerText = formatarMoeda(entradas);
+  document.getElementById("total-saidas").innerText = formatarMoeda(saidas);
+  document.getElementById("total-separado").innerText = formatarMoeda(separado);
+
+  renderizarResumoCategorias();
 }
 
-function renderizarCategoriasSelect() {
-  const select = document.getElementById("categoria");
+function renderizarResumoCategorias() {
+  const container = document.getElementById("lista-categorias-resumo");
+  container.innerHTML = "";
+
+  const gastosPorCat = {};
+
+  lancamentos.filter(l => l.tipo === "despesa").forEach(item => {
+    gastosPorCat[item.categoria] = (gastosPorCat[item.categoria] || 0) + (parseFloat(item.valor) || 0);
+  });
+
+  const chaves = Object.keys(gastosPorCat);
+  if (chaves.length === 0) {
+    container.innerHTML = "<small>Nenhuma despesa registrada.</small>";
+    return;
+  }
+
+  chaves.forEach(cat => {
+    const div = document.createElement("div");
+    div.className = "item-lista";
+    div.innerHTML = `
+      <span><strong>${cat}</strong></span>
+      <span>${formatarMoeda(gastosPorCat[cat])}</span>
+    `;
+    container.appendChild(div);
+  });
+}
+
+// --- CATEGORIAS ---
+function renderizarDropdownCategorias() {
+  const select = document.getElementById("categoria-select");
   select.innerHTML = "";
-  categorias.forEach(cat => {
+
+  if (categorias.length === 0) {
+    select.innerHTML = `<option value="Geral">Geral</option>`;
+    return;
+  }
+
+  categorias.forEach(c => {
     const opt = document.createElement("option");
-    opt.value = cat;
-    opt.textContent = cat;
+    opt.value = c.nome;
+    opt.innerText = c.nome;
     select.appendChild(opt);
   });
 }
 
-// RENDERIZAR RESUMO
-function renderizarResumo() {
-  let entradas = 0;
-  let saidas = 0;
-  let futuros = 0;
-  let totalSeparados = 0;
-  const gastosPorCat = {};
-
-  lancamentos.forEach(l => {
-    const val = parseFloat(l.valor) || 0;
-    if (l.tipo === "entrada") {
-      entradas += val;
-    } else if (l.tipo === "saida") {
-      saidas += val;
-      gastosPorCat[l.categoria] = (gastosPorCat[l.categoria] || 0) + val;
-    } else if (l.tipo === "futuro") {
-      futuros += val;
-    }
-  });
-
-  separados.forEach(s => {
-    totalSeparados += (parseFloat(s.valor) || 0);
-  });
-
-  const saldoReal = entradas - saidas;
-  const disponivelGastar = saldoReal + futuros - totalSeparados;
-
-  document.getElementById("saldo-real-conta").textContent = formatarMoeda(saldoReal);
-  document.getElementById("saldo-para-gastar").textContent = formatarMoeda(disponivelGastar);
-  document.getElementById("total-entradas").textContent = formatarMoeda(entradas);
-  document.getElementById("total-saidas").textContent = formatarMoeda(saidas);
-  document.getElementById("total-futuros").textContent = "+ " + formatarMoeda(futuros);
-  document.getElementById("total-separados").textContent = "- " + formatarMoeda(totalSeparados);
-
-  // Lista de Categorias no Resumo
-  const divCats = document.getElementById("lista-categorias");
-  divCats.innerHTML = "";
-  if (Object.keys(gastosPorCat).length === 0) {
-    divCats.innerHTML = "<small style='color: #94a3b8;'>Nenhum gasto cadastrado ainda.</small>";
-  } else {
-    for (const [cat, val] of Object.entries(gastosPorCat)) {
-      divCats.innerHTML += `
-        <div class="item-cat">
-          <span>${cat}</span>
-          <strong class="txt-vermelho">${formatarMoeda(val)}</strong>
-        </div>
-      `;
-    }
-  }
-}
-
-// RENDERIZAR CONTAS FIXAS
-function renderizarContasFixas() {
-  let totalFixas = 0;
-  let pagoFixas = 0;
-
-  const divLista = document.getElementById("lista-contas-fixas");
-  divLista.innerHTML = "";
-
-  if (contasFixas.length === 0) {
-    divLista.innerHTML = "<small style='color: #94a3b8;'>Nenhuma conta fixa cadastrada.</small>";
-  }
-
-  // Ordenar contas por dia de vencimento
-  contasFixas.sort((a, b) => (parseInt(a.vencimento) || 0) - (parseInt(b.vencimento) || 0));
-
-  contasFixas.forEach((cf, idx) => {
-    const val = parseFloat(cf.valor) || 0;
-    totalFixas += val;
-    if (cf.paga) pagoFixas += val;
-
-    const vencTexto = cf.vencimento ? ` • Vence dia ${cf.vencimento}` : "";
-
-    divLista.innerHTML += `
-      <div class="item" style="${cf.paga ? 'opacity: 0.6;' : ''}">
-        <div>
-          <input type="checkbox" ${cf.paga ? 'checked' : ''} onchange="togglePagoFixa(${idx})" style="width: auto; margin-right: 8px;">
-          <strong style="${cf.paga ? 'text-decoration: line-through;' : ''}">${cf.nome}</strong>
-          <small style="display: block; color: #64748b;">${formatarMoeda(val)}${vencTexto}</small>
-        </div>
-        <button onclick="removerContaFixa(${idx})" class="btn-excluir">🗑️</button>
-      </div>
-    `;
-  });
-
-  const restanteFixas = totalFixas - pagoFixas;
-  document.getElementById("total-contas-fixas").textContent = formatarMoeda(totalFixas);
-  document.getElementById("pago-contas-fixas").textContent = formatarMoeda(pagoFixas);
-  document.getElementById("restante-contas-fixas").textContent = formatarMoeda(restanteFixas);
-}
-
-function togglePagoFixa(idx) {
-  contasFixas[idx].paga = !contasFixas[idx].paga;
-  salvarDados();
-}
-
-function removerContaFixa(idx) {
-  if (confirm("Deseja remover esta conta fixa?")) {
-    contasFixas.splice(idx, 1);
-    salvarDados();
-  }
-}
-
-// RENDERIZAR SEPARADOS
-function renderizarSeparados() {
-  const divLista = document.getElementById("lista-separados");
-  divLista.innerHTML = "";
-
-  if (separados.length === 0) {
-    divLista.innerHTML = "<small style='color: #94a3b8;'>Nenhum valor reservado.</small>";
-  }
-
-  separados.forEach((s, idx) => {
-    divLista.innerHTML += `
-      <div class="item">
-        <div>
-          <strong>${s.desc}</strong>
-          <small style="display: block; color: #0284c7;">${formatarMoeda(s.valor)}</small>
-        </div>
-        <button onclick="removerSeparado(${idx})" class="btn-excluir">🗑️</button>
-      </div>
-    `;
-  });
-}
-
-function removerSeparado(idx) {
-  if (confirm("Deseja remover este valor separado?")) {
-    separados.splice(idx, 1);
-    salvarDados();
-  }
-}
-
-// RENDERIZAR EXTRATO DE LANÇAMENTOS
-function renderizarExtrato() {
-  const divLista = document.getElementById("lista-lancamentos");
-  divLista.innerHTML = "";
-
-  if (lancamentos.length === 0) {
-    divLista.innerHTML = "<small style='color: #94a3b8;'>Nenhum lançamento registrado.</small>";
-    return;
-  }
-
-  // Ordenar por data (mais recentes primeiro)
-  const copia = [...lancamentos].sort((a, b) => new Date(b.data) - new Date(a.data));
-
-  copia.forEach(l => {
-    const corClasse = l.tipo === "entrada" ? "txt-verde" : l.tipo === "saida" ? "txt-vermelho" : "txt-azul";
-    const sinal = l.tipo === "entrada" ? "+" : l.tipo === "saida" ? "-" : "⏳";
-
-    divLista.innerHTML += `
-      <div class="item">
-        <div>
-          <strong>${l.desc || l.categoria}</strong>
-          <small style="display: block; color: #64748b;">${formatarData(l.data)} • ${l.categoria}</small>
-        </div>
-        <div class="item-acoes">
-          <strong class="${corClasse}">${sinal} ${formatarMoeda(l.valor)}</strong>
-          <button onclick="prepararEdicao('${l.id}')" class="btn-editar">✏️</button>
-          <button onclick="removerLancamento('${l.id}')" class="btn-excluir">🗑️</button>
-        </div>
-      </div>
-    `;
-  });
-}
-
-// MANIPULAÇÃO DE FORMULÁRIOS
-document.getElementById("form-lancamento").addEventListener("submit", (e) => {
+document.getElementById("form-categoria").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const editId = document.getElementById("edit-id").value;
-  const desc = document.getElementById("desc").value;
-  const valor = parseFloat(document.getElementById("valor").value);
-  const data = document.getElementById("data").value;
-  const tipo = document.getElementById("tipo").value;
-  const categoria = document.getElementById("categoria").value;
-
-  if (editId) {
-    const idx = lancamentos.findIndex(l => l.id === editId);
-    if (idx !== -1) {
-      lancamentos[idx] = { id: editId, desc, valor, data, tipo, categoria };
-    }
-  } else {
-    const novo = {
-      id: Date.now().toString(),
-      desc,
-      valor,
-      data,
-      tipo,
-      categoria
-    };
-    lancamentos.push(novo);
+  const nome = document.getElementById("categoria-nome").value.trim();
+  if (nome) {
+    await addDoc(collection(db, "categorias"), { nome });
+    document.getElementById("form-categoria").reset();
   }
-
-  cancelarEdicao();
-  salvarDados();
 });
 
-function prepararEdicao(id) {
-  const item = lancamentos.find(l => l.id === id);
-  if (!item) return;
+function renderizarGerenciadorCategorias() {
+  const container = document.getElementById("lista-categorias-gerenciador");
+  container.innerHTML = "";
 
-  document.getElementById("edit-id").value = item.id;
-  document.getElementById("desc").value = item.desc || "";
-  document.getElementById("valor").value = item.valor;
-  document.getElementById("data").value = item.data;
-  document.getElementById("tipo").value = item.tipo;
-  document.getElementById("categoria").value = item.categoria;
-
-  document.getElementById("titulo-form-lancamento").textContent = "✏️ Editar Lançamento";
-  document.getElementById("btn-submit-lancamento").textContent = "Salvar Alterações";
-  document.getElementById("btn-cancelar-edicao").style.display = "block";
-
-  mudarAba("aba-novo", document.getElementById("btn-nav-novo"));
+  categorias.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "item-lista";
+    div.innerHTML = `
+      <span>${item.nome}</span>
+      <button class="btn-excluir">❌</button>
+    `;
+    div.querySelector(".btn-excluir").onclick = () => deleteDoc(doc(db, "categorias", item.id));
+    container.appendChild(div);
+  });
 }
 
-function cancelarEdicao() {
-  document.getElementById("edit-id").value = "";
+// --- EXTRATO ---
+function renderizarExtrato() {
+  const container = document.getElementById("lista-extrato");
+  container.innerHTML = "";
+
+  const ordenados = [...lancamentos].sort((a,b) => new Date(b.data) - new Date(a.data));
+
+  ordenados.forEach(item => {
+    const div = document.createElement("div");
+    div.className = `item-lista ${item.tipo}`;
+    
+    const info = document.createElement("div");
+    info.innerHTML = `<strong>${item.desc}</strong> (${item.categoria})<br><small>${item.data}</small>`;
+
+    const acoes = document.createElement("div");
+    acoes.innerHTML = `<strong>${item.tipo === 'receita' ? '+' : '-'} ${formatarMoeda(item.valor)}</strong>`;
+
+    const btnEdit = document.createElement("button");
+    btnEdit.className = "btn-editar";
+    btnEdit.innerText = "✏️";
+    btnEdit.onclick = () => prepararEdicaoLancamento(item);
+
+    const btnDel = document.createElement("button");
+    btnDel.className = "btn-excluir";
+    btnDel.innerText = "❌";
+    btnDel.onclick = () => deleteDoc(doc(db, "lancamentos", item.id));
+
+    acoes.appendChild(btnEdit);
+    acoes.appendChild(btnDel);
+    div.appendChild(info);
+    div.appendChild(acoes);
+    container.appendChild(div);
+  });
+}
+
+function prepararEdicaoLancamento(item) {
+  document.getElementById("edit-lancamento-id").value = item.id;
+  document.getElementById("desc").value = item.desc === "Sem descrição" ? "" : item.desc;
+  document.getElementById("valor").value = item.valor;
+  document.getElementById("tipo").value = item.tipo;
+  document.getElementById("categoria-select").value = item.categoria;
+  document.getElementById("data").value = item.data;
+
+  document.getElementById("titulo-form-lancamento").innerText = "Editar Lançamento";
+  document.getElementById("btn-salvar-lancamento").innerText = "Atualizar Lançamento";
+  document.getElementById("btn-cancelar-edicao").style.display = "inline-block";
+
+  trocarAba('novo', document.getElementById('btn-novo'));
+}
+
+document.getElementById("btn-cancelar-edicao").addEventListener("click", resetarFormLancamento);
+
+function resetarFormLancamento() {
+  document.getElementById("edit-lancamento-id").value = "";
   document.getElementById("form-lancamento").reset();
-  document.getElementById("data").valueAsDate = new Date();
-  document.getElementById("titulo-form-lancamento").textContent = "🛒 Registrar Lançamento";
-  document.getElementById("btn-submit-lancamento").textContent = "Adicionar Lançamento";
+  document.getElementById("titulo-form-lancamento").innerText = "Novo Lançamento";
+  document.getElementById("btn-salvar-lancamento").innerText = "Salvar Lançamento";
   document.getElementById("btn-cancelar-edicao").style.display = "none";
 }
 
-function removerLancamento(id) {
-  if (confirm("Deseja apagar este lançamento?")) {
-    lancamentos = lancamentos.filter(l => l.id !== id);
-    salvarDados();
+document.getElementById("form-lancamento").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = document.getElementById("edit-lancamento-id").value;
+  
+  // Descrição Opcional
+  const descInput = document.getElementById("desc").value.trim();
+  const desc = descInput !== "" ? descInput : "Sem descrição";
+
+  const valor = parseFloat(document.getElementById("valor").value);
+  const tipo = document.getElementById("tipo").value;
+  const categoria = document.getElementById("categoria-select").value;
+  const data = document.getElementById("data").value;
+
+  if (id) {
+    await updateDoc(doc(db, "lancamentos", id), { desc, valor, tipo, categoria, data });
+  } else {
+    await addDoc(collection(db, "lancamentos"), { desc, valor, tipo, categoria, data });
   }
+
+  resetarFormLancamento();
+  trocarAba('extrato', document.getElementById('btn-extrato'));
+});
+
+// --- ENTRADAS FUTURAS ---
+document.getElementById("form-futuro").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const desc = document.getElementById("futuro-desc").value;
+  const valor = parseFloat(document.getElementById("futuro-valor").value);
+  const data = document.getElementById("futuro-data").value;
+
+  await addDoc(collection(db, "entradasFuturas"), { desc, valor, data });
+  document.getElementById("form-futuro").reset();
+});
+
+function renderizarFuturos() {
+  const container = document.getElementById("lista-futuros");
+  container.innerHTML = "";
+
+  const ordenados = [...entradasFuturas].sort((a,b) => new Date(a.data) - new Date(b.data));
+
+  ordenados.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "item-lista receita";
+
+    const info = document.createElement("div");
+    info.innerHTML = `<strong>${item.desc}</strong><br><small>Previsto: ${item.data}</small><br><span>${formatarMoeda(item.valor)}</span>`;
+
+    const acoes = document.createElement("div");
+
+    const btnReceber = document.createElement("button");
+    btnReceber.className = "btn-primary";
+    btnReceber.innerText = "✅ Receber";
+    btnReceber.onclick = async () => {
+      await addDoc(collection(db, "lancamentos"), {
+        desc: `[Depósito] ${item.desc}`,
+        valor: parseFloat(item.valor),
+        tipo: "receita",
+        categoria: "Receita",
+        data: item.data
+      });
+      await deleteDoc(doc(db, "entradasFuturas", item.id));
+    };
+
+    const btnDel = document.createElement("button");
+    btnDel.className = "btn-excluir";
+    btnDel.innerText = "❌";
+    btnDel.onclick = () => deleteDoc(doc(db, "entradasFuturas", item.id));
+
+    acoes.appendChild(btnReceber);
+    acoes.appendChild(btnDel);
+    div.appendChild(info);
+    div.appendChild(acoes);
+    container.appendChild(div);
+  });
 }
 
-// ADICIONAR CONTA FIXA
-document.getElementById("form-conta-fixa").addEventListener("submit", (e) => {
+// --- CONTAS FIXAS ---
+document.getElementById("form-fixa").addEventListener("submit", async (e) => {
   e.preventDefault();
   const nome = document.getElementById("fixa-nome").value;
   const valor = parseFloat(document.getElementById("fixa-valor").value);
-  const vencimento = document.getElementById("fixa-vencimento").value;
+  const vencimento = parseInt(document.getElementById("fixa-vencimento").value);
 
-  contasFixas.push({ nome, valor, vencimento, paga: false });
-  document.getElementById("form-conta-fixa").reset();
-  salvarDados();
+  await addDoc(collection(db, "contasFixas"), { nome, valor, vencimento, paga: false });
+  document.getElementById("form-fixa").reset();
 });
 
-// ADICIONAR SEPARADO
-document.getElementById("form-separado").addEventListener("submit", (e) => {
-  e.preventDefault();
-  const desc = document.getElementById("sep-desc").value;
-  const valor = parseFloat(document.getElementById("sep-valor").value);
+function renderizarFixas() {
+  const container = document.getElementById("lista-fixas");
+  container.innerHTML = "";
 
-  separados.push({ desc, valor });
+  // Cálculo do total e quantidades
+  const totalValor = contasFixas.reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
+  const qtdTotal = contasFixas.length;
+  const qtdPendentes = contasFixas.filter(f => !f.paga).length;
+
+  // Atualiza os indicadores no topo da aba Fixas
+  const elemValor = document.getElementById("total-fixas-valor");
+  const elemQtd = document.getElementById("total-fixas-qtd");
+  if (elemValor) elemValor.innerText = formatarMoeda(totalValor);
+  if (elemQtd) elemQtd.innerText = `${qtdTotal} ${qtdTotal === 1 ? 'conta' : 'contas'} (${qtdPendentes} ${qtdPendentes === 1 ? 'pendente' : 'pendentes'})`;
+
+  contasFixas.sort((a,b) => a.vencimento - b.vencimento).forEach(item => {
+    const div = document.createElement("div");
+    div.className = `item-lista ${item.paga ? 'item-pago' : ''}`;
+
+    const info = document.createElement("div");
+    info.innerHTML = `<strong>${item.nome}</strong> - Vence dia ${item.vencimento}<br><span>${formatarMoeda(item.valor)}</span>`;
+
+    const acoes = document.createElement("div");
+
+    const btnPagar = document.createElement("button");
+    btnPagar.className = "btn-primary";
+    btnPagar.innerText = item.paga ? 'Desmarcar' : 'Pagar';
+    btnPagar.onclick = async () => {
+      const novoStatus = !item.paga;
+      await updateDoc(doc(db, "contasFixas", item.id), { paga: novoStatus });
+
+      if (novoStatus) {
+        const hoje = new Date().toISOString().split('T')[0];
+        await addDoc(collection(db, "lancamentos"), {
+          desc: `[Conta Fixa] ${item.nome}`,
+          valor: parseFloat(item.valor),
+          tipo: "despesa",
+          categoria: "Contas Fixas",
+          data: hoje
+        });
+      }
+    };
+
+    const btnDel = document.createElement("button");
+    btnDel.className = "btn-excluir";
+    btnDel.innerText = "❌";
+    btnDel.onclick = () => deleteDoc(doc(db, "contasFixas", item.id));
+
+    acoes.appendChild(btnPagar);
+    acoes.appendChild(btnDel);
+    div.appendChild(info);
+    div.appendChild(acoes);
+    container.appendChild(div);
+  });
+}
+
+// --- VALORES SEPARADOS ---
+document.getElementById("form-separado").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const nome = document.getElementById("separado-nome").value;
+  const valor = parseFloat(document.getElementById("separado-valor").value);
+
+  await addDoc(collection(db, "valoresSeparados"), { nome, valor });
   document.getElementById("form-separado").reset();
-  salvarDados();
 });
 
-// CATEGORIAS
-document.getElementById("form-nova-categoria").addEventListener("submit", (e) => {
-  e.preventDefault();
-  const input = document.getElementById("nova-cat-nome");
-  const nomeCat = input.value.trim();
+function renderizarSeparados() {
+  const container = document.getElementById("lista-separados");
+  container.innerHTML = "";
 
-  if (nomeCat && !categorias.includes(nomeCat)) {
-    categorias.push(nomeCat);
-    input.value = "";
-    salvarDados();
-  }
+  valoresSeparados.forEach(item => {
+    const divItem = document.createElement("div");
+    divItem.className = "item-lista";
+
+    const info = document.createElement("div");
+    info.innerHTML = `<strong>${item.nome}</strong><br><span>${formatarMoeda(item.valor)}</span>`;
+
+    const acoes = document.createElement("div");
+
+    const btnEdit = document.createElement("button");
+    btnEdit.className = "btn-primary";
+    btnEdit.innerText = "✏️ Editar";
+    btnEdit.onclick = async () => {
+      const novoNome = prompt("Novo nome do objetivo:", item.nome);
+      const novoValorStr = prompt("Novo valor reservado (R$):", item.valor);
+      
+      if (novoNome !== null && novoValorStr !== null) {
+        const novoValor = parseFloat(novoValorStr);
+        if (!isNaN(novoValor)) {
+          await updateDoc(doc(db, "valoresSeparados", item.id), { nome: novoNome, valor: novoValor });
+        }
+      }
+    };
+
+    const btnDel = document.createElement("button");
+    btnDel.className = "btn-excluir";
+    btnDel.innerText = "❌";
+    btnDel.onclick = () => deleteDoc(doc(db, "valoresSeparados", item.id));
+
+    acoes.appendChild(btnEdit);
+    acoes.appendChild(btnDel);
+    divItem.appendChild(info);
+    divItem.appendChild(acoes);
+    container.appendChild(divItem);
+  });
+}
+
+// --- CALCULADORA ---
+let calcExpressao = "";
+const display = document.getElementById("calc-display");
+
+document.querySelectorAll(".calc-num").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const val = btn.getAttribute("data-val");
+    if (display.value === "0" && val !== ".") {
+      calcExpressao = val;
+    } else {
+      calcExpressao += val;
+    }
+    display.value = calcExpressao;
+  });
 });
 
-function removerCategoriaSelecionada() {
-  const sel = document.getElementById("categoria");
-  const cat = sel.value;
-  if (!cat) return;
+document.getElementById("calc-c").addEventListener("click", () => {
+  calcExpressao = "";
+  display.value = "0";
+});
 
-  if (confirm(`Deseja apagar a categoria "${cat}"?`)) {
-    categorias = categorias.filter(c => c !== cat);
-    salvarDados();
+document.getElementById("calc-back").addEventListener("click", () => {
+  calcExpressao = calcExpressao.slice(0, -1);
+  display.value = calcExpressao || "0";
+});
+
+document.getElementById("calc-eq").addEventListener("click", () => {
+  try {
+    const res = eval(calcExpressao);
+    display.value = res;
+    calcExpressao = res.toString();
+  } catch {
+    display.value = "Erro";
+    calcExpressao = "";
   }
-}
-
-// UTILITÁRIOS DE FORMATAÇÃO
-function formatarMoeda(val) {
-  return (parseFloat(val) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-
-function formatarData(dataISO) {
-  if (!dataISO) return "";
-  const partes = dataISO.split("-");
-  if (partes.length === 3) {
-    return `${partes[2]}/${partes[1]}/${partes[0]}`;
-  }
-  return dataISO;
-}
-
-// INICIALIZAÇÃO
-window.onload = () => {
-  document.getElementById("data").valueAsDate = new Date();
-  carregarDados();
-};
+});
