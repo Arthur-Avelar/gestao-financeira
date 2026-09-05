@@ -316,16 +316,35 @@ function renderizarFixas() {
   const container = document.getElementById("lista-fixas");
   container.innerHTML = "";
 
-  // Cálculo do total e quantidades
-  const totalValor = contasFixas.reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
-  const qtdTotal = contasFixas.length;
-  const qtdPendentes = contasFixas.filter(f => !f.paga).length;
+  // Cálculos de totais e quantidades
+  const totalGeral = contasFixas.reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
+  
+  const pendentesArr = contasFixas.filter(f => !f.paga);
+  const totalPendente = pendentesArr.reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
+  
+  const pagasArr = contasFixas.filter(f => f.paga);
+  const totalPago = pagasArr.reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
 
-  // Atualiza os indicadores no topo da aba Fixas
+  const qtdTotal = contasFixas.length;
+  const qtdPendentes = pendentesArr.length;
+  const qtdPagas = pagasArr.length;
+
+  // Atualização dos elementos na tela
   const elemValor = document.getElementById("total-fixas-valor");
   const elemQtd = document.getElementById("total-fixas-qtd");
-  if (elemValor) elemValor.innerText = formatarMoeda(totalValor);
-  if (elemQtd) elemQtd.innerText = `${qtdTotal} ${qtdTotal === 1 ? 'conta' : 'contas'} (${qtdPendentes} ${qtdPendentes === 1 ? 'pendente' : 'pendentes'})`;
+  const elemPendente = document.getElementById("total-fixas-pendente");
+  const elemQtdPendente = document.getElementById("qtd-fixas-pendente");
+  const elemPago = document.getElementById("total-fixas-pago");
+  const elemQtdPago = document.getElementById("qtd-fixas-pago");
+
+  if (elemValor) elemValor.innerText = formatarMoeda(totalGeral);
+  if (elemQtd) elemQtd.innerText = `${qtdTotal} ${qtdTotal === 1 ? 'conta' : 'contas'}`;
+
+  if (elemPendente) elemPendente.innerText = formatarMoeda(totalPendente);
+  if (elemQtdPendente) elemQtdPendente.innerText = `${qtdPendentes} ${qtdPendentes === 1 ? 'pendente' : 'pendentes'}`;
+
+  if (elemPago) elemPago.innerText = formatarMoeda(totalPago);
+  if (elemQtdPago) elemQtdPago.innerText = `${qtdPagas} ${qtdPagas === 1 ? 'paga' : 'pagas'}`;
 
   contasFixas.sort((a,b) => a.vencimento - b.vencimento).forEach(item => {
     const div = document.createElement("div");
