@@ -114,39 +114,50 @@ function atualizarTudo() {
   renderizarExtrato();
   renderizarFixas();
   renderizarCartao();
+  renderizarSeparados();
 }
 
-// --- RESUMO & QUANTO POSSO GASTAR ---
+// --- RESUMO & QUANTO POSSO GASTAR (FORMULA SOLICITADA) ---
 function atualizarResumo() {
   const lancamentosDoMes = lancamentos.filter(l => l.data && l.data.startsWith(mesSelecionado));
 
   const entradas = lancamentosDoMes.filter(l => l.tipo === "receita").reduce((acc, l) => acc + (parseFloat(l.valor) || 0), 0);
   const saidas = lancamentosDoMes.filter(l => l.tipo === "despesa").reduce((acc, l) => acc + (parseFloat(l.valor) || 0), 0);
-  const separado = valoresSeparados.reduce((acc, s) => acc + (parseFloat(s.valor) || 0), 0);
   
-  const fixasPendentes = contasFixas.filter(f => {
-    const mesesPagos = f.mesesPagos || [];
-    return !mesesPagos.includes(mesSelecionado);
-  }).reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
+  // Saldo em Conta (Entradas - Saídas)
+  const saldoAtual = entradas - saidas;
 
+  // A Receber (Entradas Futuras do mês)
   const totalFuturos = entradasFuturas.filter(f => f.data && f.data.startsWith(mesSelecionado))
     .reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
 
-  // Calcula o total da fatura do cartão para o mês selecionado
-  const parcelasDoMes = calcularParcelasDoMes();
-  const totalFaturaCartao = parcelasDoMes.reduce((acc, p) => acc + p.valorParcela, 0);
+  // Total Separado
+  const separado = valoresSeparados.reduce((acc, s) => acc + (parseFloat(s.valor) || 0), 0);
 
-  const saldo = entradas - saidas;
-  
-  // Subtrai a fatura do cartão junto com o valor separado e as contas fixas pendentes
-  const quantoPossoGastar = (saldo + totalFuturos) - separado - fixasPendentes - totalFaturaCartao;
+  // Contas Fixas Pendentes no mês (Apenas as que ainda não foram pagas)
+  const fixasPendentes = contasFixas.filter(f => {
+    const isAtiva = f.ativa !== false;
+    const mesesPagos = f.mesesPagos || [];
+    const jaPaga = mesesPagos.includes(mesSelecionado);
+    return isAtiva && !jaPaga;
+  }).reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
 
-  document.getElementById("quanto-posso-gastar").innerText = formatarMoeda(quantoPossoGastar);
-  document.getElementById("saldo-total").innerText = formatarMoeda(saldo);
-  document.getElementById("total-futuros-card").innerText = formatarMoeda(totalFuturos);
-  document.getElementById("total-entradas").innerText = formatarMoeda(entradas);
-  document.getElementById("total-saidas").innerText = formatarMoeda(saidas);
-  document.getElementById("total-separado").innerText = formatarMoeda(separado);
+  // FÓRMULA SOLICITADA: (SALDO + A RECEBER) - TOTAL SEPARADO - CONTAS FIXAS
+  const quantoPossoGastar = (saldoAtual + totalFuturos) - separado - fixasPendentes;
+
+  const elGastar = document.getElementById("quanto-posso-gastar");
+  const elSaldo = document.getElementById("saldo-total");
+  const elFuturos = document.getElementById("total-futuros-card");
+  const elEntradas = document.getElementById("total-entradas");
+  const elSaidas = document.getElementById("total-saidas");
+  const elSeparado = document.getElementById("total-separado");
+
+  if (elGastar) elGastar.innerText = formatarMoeda(quantoPossoGastar);
+  if (elSaldo) elSaldo.innerText = formatarMoeda(saldoAtual);
+  if (elFuturos) elFuturos.innerText = formatarMoeda(totalFuturos);
+  if (elEntradas) elEntradas.innerText = formatarMoeda(entradas);
+  if (elSaidas) elSaidas.innerText = formatarMoeda(saidas);
+  if (elSeparado) elSeparado.innerText = formatarMoeda(separado);
 
   renderizarResumoCategorias(lancamentosDoMes);
 }
@@ -634,12 +645,16 @@ function renderizarFixas() {
   });
 }
 
-
-// --- VALORES SEPARADOS ---
-document.getElementById("form-separado").addEventListener("submit", async (e) => {
+// --- VALORES SEPARADOS / OBJETIVOS ---
+document.getElementById("form-separado")?.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const nome = document.getElementById("separado-nome").value;
-  const valor = parseFloat(document.getElementById("separado-valor").value);
+  const nomeInput = document.getElementById("separado-nome");
+  const valorInput = document.getElementById("separado-valor");
+
+  const nome = nomeInput ? nomeInput.value.trim() : "";
+  const valor = valorInput ? parseFloat(valorInput.value) : 0;
+
+  if (!nome || isNaN(valor)) return;
 
   await addDoc(collection(db, "valoresSeparados"), { nome, valor });
   document.getElementById("form-separado").reset();
@@ -647,7 +662,13 @@ document.getElementById("form-separado").addEventListener("submit", async (e) =>
 
 function renderizarSeparados() {
   const container = document.getElementById("lista-separados");
+  if (!container) return;
   container.innerHTML = "";
+
+  if (valoresSeparados.length === 0) {
+    container.innerHTML = "<small>Nenhum valor separado/reservado cadastrado.</small>";
+    return;
+  }
 
   valoresSeparados.forEach(item => {
     const divItem = document.createElement("div");
@@ -658,25 +679,38 @@ function renderizarSeparados() {
 
     const acoes = document.createElement("div");
 
+    // Botão Editar
     const btnEdit = document.createElement("button");
-    btnEdit.className = "btn-primary";
-    btnEdit.innerText = "✏️ Editar";
+    btnEdit.className = "btn-editar";
+    btnEdit.innerText = "✏️";
+    btnEdit.style.marginRight = "8px";
     btnEdit.onclick = async () => {
       const novoNome = prompt("Novo nome do objetivo:", item.nome);
+      if (novoNome === null) return; // Cancelou
+
       const novoValorStr = prompt("Novo valor reservado (R$):", item.valor);
-      
-      if (novoNome !== null && novoValorStr !== null) {
-        const novoValor = parseFloat(novoValorStr);
-        if (!isNaN(novoValor)) {
-          await updateDoc(doc(db, "valoresSeparados", item.id), { nome: novoNome, valor: novoValor });
-        }
+      if (novoValorStr === null) return; // Cancelou
+
+      const novoValor = parseFloat(novoValorStr.replace(',', '.'));
+      if (!isNaN(novoValor)) {
+        await updateDoc(doc(db, "valoresSeparados", item.id), { 
+          nome: novoNome.trim() || item.nome, 
+          valor: novoValor 
+        });
+      } else {
+        alert("Valor inválido inserido.");
       }
     };
 
+    // Botão Excluir
     const btnDel = document.createElement("button");
     btnDel.className = "btn-excluir";
     btnDel.innerText = "❌";
-    btnDel.onclick = () => deleteDoc(doc(db, "valoresSeparados", item.id));
+    btnDel.onclick = async () => {
+      if (confirm(`Deseja remover o item "${item.nome}" dos Separados?`)) {
+        await deleteDoc(doc(db, "valoresSeparados", item.id));
+      }
+    };
 
     acoes.appendChild(btnEdit);
     acoes.appendChild(btnDel);
