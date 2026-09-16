@@ -16,28 +16,34 @@
         <button class="tab-btn" id="btn-extrato">📜 Extrato</button>
         <button class="tab-btn" id="btn-novo">➕ Novo</button>
         <button class="tab-btn" id="btn-fixas">📌 Fixas</button>
+        <button class="tab-btn" id="btn-cartao">💳 Cartão</button>
         <button class="tab-btn" id="btn-futuros">🔮 Futuros</button>
         <button class="tab-btn" id="btn-separados">🎯 Separados</button>
         <button class="tab-btn" id="btn-calculadora">🧮 Calc</button>
       </nav>
     </header>
 
+    <!-- SELETOR GLOBAL DE MÊS -->
+    <div class="seletor-mes-container">
+      <button id="btn-mes-anterior" class="btn-mes-nav">◀</button>
+      <span id="label-mes-atual">Carregando...</span>
+      <button id="btn-mes-proximo" class="btn-mes-nav">▶</button>
+    </div>
+
     <!-- ABA RESUMO -->
     <section id="aba-resumo" class="aba-conteudo active">
-      <!-- DESTAQUE QUANTO POSSO GASTAR -->
       <div class="card destaque-gasto">
         <h3>Quanto Posso Gastar</h3>
         <p id="quanto-posso-gastar">R$ 0,00</p>
       </div>
 
-      <!-- GRID DE CARDS SECUNDÁRIOS -->
       <div class="cards-grid">
         <div class="card saldo">
           <h3>Saldo Atual</h3>
           <p id="saldo-total">R$ 0,00</p>
         </div>
         <div class="card futuro-card">
-          <h3>A Receber </h3>
+          <h3>A Receber</h3>
           <p id="total-futuros-card">R$ 0,00</p>
         </div>
         <div class="card receita">
@@ -112,11 +118,10 @@
       </div>
     </section>
 
-<!-- ABA CONTAS FIXAS -->
+    <!-- ABA CONTAS FIXAS -->
     <section id="aba-fixas" class="aba-conteudo">
       <h2>Contas Fixas</h2>
 
-      <!-- PAINEL DE RESUMO DAS FIXAS -->
       <div class="cards-grid" style="margin-bottom: 20px;">
         <div class="card">
           <h3>Total de Contas</h3>
@@ -144,6 +149,46 @@
         </div>
       </form>
       <div id="lista-fixas" class="lista-items"></div>
+    </section>
+
+    <!-- ABA CARTÃO DE CRÉDITO -->
+    <section id="aba-cartao" class="aba-conteudo">
+      <h2>Cartão de Crédito</h2>
+      
+      <div class="card destaque-gasto" style="margin-bottom: 20px; border-color: #a855f7;">
+        <h3>Fatura do Mês (<span id="cartao-mes-ref">-</span>)</h3>
+        <p id="total-fatura-mes" style="color: #c084fc;">R$ 0,00</p>
+        <button id="btn-pagar-fatura" class="btn-primary" style="margin-top: 10px; background: #a855f7;">Pagar Fatura</button>
+      </div>
+
+      <form id="form-cartao">
+        <div class="form-group">
+          <label for="cartao-desc">Descrição da Compra</label>
+          <input type="text" id="cartao-desc" placeholder="Ex: Mercado, Amazon, Computador" required>
+        </div>
+        <div class="form-group">
+          <label for="cartao-valor">Valor Total (R$)</label>
+          <input type="number" id="cartao-valor" step="0.01" placeholder="0,00" required>
+        </div>
+        <div class="form-row">
+          <div style="flex: 1;">
+            <label for="cartao-parcelas">Nº Parcelas</label>
+            <input type="number" id="cartao-parcelas" min="1" value="1" required>
+          </div>
+          <div style="flex: 1;">
+            <label for="cartao-fechamento">Dia Fechamento</label>
+            <input type="number" id="cartao-fechamento" min="1" max="31" value="5" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="cartao-data">Data da Compra</label>
+          <input type="date" id="cartao-data" required>
+        </div>
+        <button type="submit" class="btn-primary">Adicionar Compra</button>
+      </form>
+
+      <h3 style="margin-top: 25px;">Compras no Cartão (Fatura do Mês)</h3>
+      <div id="lista-cartao-mes" class="lista-items"></div>
     </section>
 
     <!-- ABA ENTRADAS/DEPÓSITOS FUTUROS -->
