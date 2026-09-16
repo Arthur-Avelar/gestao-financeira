@@ -759,3 +759,4 @@ document.getElementById("calc-eq").addEventListener("click", () => {
 
 // Inicialização da interface do mês ao carregar
 atualizarInterfaceSeletorMes();
+ 
