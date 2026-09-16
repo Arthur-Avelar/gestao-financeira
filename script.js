@@ -494,43 +494,57 @@ function renderizarFuturos() {
   });
 }
 
-// --- CONTAS FIXAS ---
-document.getElementById("form-fixa").addEventListener("submit", async (e) => {
+// --- CONTAS FIXAS (COM SUPORTE A DESATIVAR/EXCLUIR) ---
+document.getElementById("form-fixa")?.addEventListener("submit", async (e) => {
   e.preventDefault();
   const nome = document.getElementById("fixa-nome").value;
   const valor = parseFloat(document.getElementById("fixa-valor").value);
   const vencimento = parseInt(document.getElementById("fixa-vencimento").value);
 
-  await addDoc(collection(db, "contasFixas"), { nome, valor, vencimento, mesesPagos: [] });
+  // Criamos a conta marcada como ativa (ativa: true)
+  await addDoc(collection(db, "contasFixas"), { 
+    nome, 
+    valor, 
+    vencimento, 
+    mesesPagos: [],
+    ativa: true 
+  });
   document.getElementById("form-fixa").reset();
 });
 
 function renderizarFixas() {
   const container = document.getElementById("lista-fixas");
+  if (!container) return;
   container.innerHTML = "";
 
-  const totalGeral = contasFixas.reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
-  
-  const pendentesArr = contasFixas.filter(f => !(f.mesesPagos || []).includes(mesSelecionado));
+  // Filtra apenas as contas que estão ATIVAS OU que já foram pagas neste mês específico
+  const fixasVisiveis = contasFixas.filter(f => {
+    const isAtiva = f.ativa !== false; // Se não tiver a propriedade, considera ativa
+    const jaPagaNesteMes = (f.mesesPagos || []).includes(mesSelecionado);
+    return isAtiva || jaPagaNesteMes;
+  });
+
+  const totalGeral = fixasVisiveis.reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
+  const pendentesArr = fixasVisiveis.filter(f => !(f.mesesPagos || []).includes(mesSelecionado));
   const totalPendente = pendentesArr.reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
-  
-  const pagasArr = contasFixas.filter(f => (f.mesesPagos || []).includes(mesSelecionado));
+  const pagasArr = fixasVisiveis.filter(f => (f.mesesPagos || []).includes(mesSelecionado));
   const totalPago = pagasArr.reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
 
-  const qtdTotal = contasFixas.length;
-  const qtdPendentes = pendentesArr.length;
-  const qtdPagas = pagasArr.length;
+  const elVal = document.getElementById("total-fixas-valor");
+  const elQtd = document.getElementById("total-fixas-qtd");
+  const elPen = document.getElementById("total-fixas-pendente");
+  const elPenQtd = document.getElementById("qtd-fixas-pendente");
+  const elPag = document.getElementById("total-fixas-pago");
+  const elPagQtd = document.getElementById("qtd-fixas-pago");
 
-  document.getElementById("total-fixas-valor").innerText = formatarMoeda(totalGeral);
-  document.getElementById("total-fixas-qtd").innerText = `${qtdTotal} ${qtdTotal === 1 ? 'conta' : 'contas'}`;
+  if (elVal) elVal.innerText = formatarMoeda(totalGeral);
+  if (elQtd) elQtd.innerText = `${fixasVisiveis.length} contas`;
+  if (elPen) elPen.innerText = formatarMoeda(totalPendente);
+  if (elPenQtd) elPenQtd.innerText = `${pendentesArr.length} pendentes`;
+  if (elPag) elPag.innerText = formatarMoeda(totalPago);
+  if (elPagQtd) elPagQtd.innerText = `${pagasArr.length} pagas`;
 
-  document.getElementById("total-fixas-pendente").innerText = formatarMoeda(totalPendente);
-  document.getElementById("qtd-fixas-pendente").innerText = `${qtdPendentes} ${qtdPendentes === 1 ? 'pendente' : 'pendentes'}`;
-
-  document.getElementById("total-fixas-pago").innerText = formatarMoeda(totalPago);
-  document.getElementById("qtd-fixas-pago").innerText = `${qtdPagas} ${qtdPagas === 1 ? 'paga' : 'pagas'}`;
-
-  contasFixas.sort((a,b) => a.vencimento - b.vencimento).forEach(item => {
+  fixasVisiveis.sort((a,b) => a.vencimento - b.vencimento).forEach(item => {
     const mesesPagos = item.mesesPagos || [];
     const estaPagaNesteMes = mesesPagos.includes(mesSelecionado);
 
@@ -541,46 +555,47 @@ function renderizarFixas() {
     info.innerHTML = `<strong>${item.nome}</strong> - Vence dia ${item.vencimento}<br><span>${formatarMoeda(item.valor)}</span>`;
 
     const acoes = document.createElement("div");
-
     const btnPagar = document.createElement("button");
     btnPagar.className = "btn-primary";
     btnPagar.innerText = estaPagaNesteMes ? 'Desmarcar' : 'Pagar';
     
     btnPagar.onclick = async () => {
       let novosMeses = [...mesesPagos];
-
       if (estaPagaNesteMes) {
         novosMeses = novosMeses.filter(m => m !== mesSelecionado);
       } else {
         novosMeses.push(mesSelecionado);
-
         const diaVenc = String(item.vencimento).padStart(2, '0');
-        const dataLancamento = `${mesSelecionado}-${diaVenc}`;
-
         await addDoc(collection(db, "lancamentos"), {
           desc: `[Conta Fixa] ${item.nome}`,
           valor: parseFloat(item.valor),
           tipo: "despesa",
           categoria: "Contas Fixas",
-          data: dataLancamento
+          data: `${mesSelecionado}-${diaVenc}`
         });
       }
-
       await updateDoc(doc(db, "contasFixas", item.id), { mesesPagos: novosMeses });
     };
 
-    const btnDel = document.createElement("button");
-    btnDel.className = "btn-excluir";
-    btnDel.innerText = "❌";
-    btnDel.onclick = () => deleteDoc(doc(db, "contasFixas", item.id));
+    // Botão de Encerrar/Desativar para meses futuros
+    const btnEncerrar = document.createElement("button");
+    btnEncerrar.className = "btn-excluir";
+    btnEncerrar.innerText = "🚫";
+    btnEncerrar.title = "Encerrar conta (não aparecerá nos próximos meses)";
+    btnEncerrar.onclick = async () => {
+      if (confirm(`Deseja encerrar a conta "${item.nome}"? Ela deixará de aparecer nos próximos meses, mas o histórico passado será mantido.`)) {
+        await updateDoc(doc(db, "contasFixas", item.id), { ativa: false });
+      }
+    };
 
     acoes.appendChild(btnPagar);
-    acoes.appendChild(btnDel);
+    acoes.appendChild(btnEncerrar);
     div.appendChild(info);
     div.appendChild(acoes);
     container.appendChild(div);
   });
 }
+
 
 // --- VALORES SEPARADOS ---
 document.getElementById("form-separado").addEventListener("submit", async (e) => {
@@ -672,4 +687,3 @@ document.getElementById("calc-eq").addEventListener("click", () => {
 
 // Inicialização da interface do mês ao carregar
 atualizarInterfaceSeletorMes();
- 
