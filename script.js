@@ -221,44 +221,82 @@ function renderizarGerenciadorCategorias() {
   });
 }
 
-// --- EXTRATO ---
+// --- EXTRATO AGRUPADO POR DATA (COM DIA DA SEMANA) ---
 function renderizarExtrato() {
   const container = document.getElementById("lista-extrato");
+  if (!container) return;
   container.innerHTML = "";
 
   const lancamentosDoMes = lancamentos.filter(l => l.data && l.data.startsWith(mesSelecionado));
-  const ordenados = [...lancamentosDoMes].sort((a,b) => new Date(b.data) - new Date(a.data));
 
-  if (ordenados.length === 0) {
+  if (lancamentosDoMes.length === 0) {
     container.innerHTML = "<small>Nenhuma transação encontrada para este mês.</small>";
     return;
   }
 
-  ordenados.forEach(item => {
-    const div = document.createElement("div");
-    div.className = `item-lista ${item.tipo}`;
-    
-    const info = document.createElement("div");
-    info.innerHTML = `<strong>${item.desc}</strong> (${item.categoria})<br><small>${item.data}</small>`;
+  // Agrupa os lançamentos por data
+  const agrupadosPorData = {};
+  lancamentosDoMes.forEach(item => {
+    if (!agrupadosPorData[item.data]) {
+      agrupadosPorData[item.data] = [];
+    }
+    agrupadosPorData[item.data].push(item);
+  });
 
-    const acoes = document.createElement("div");
-    acoes.innerHTML = `<strong>${item.tipo === 'receita' ? '+' : '-'} ${formatarMoeda(item.valor)}</strong>`;
+  // Ordena as datas da mais recente para a mais antiga
+  const datasOrdenadas = Object.keys(agrupadosPorData).sort((a, b) => new Date(b) - new Date(a));
 
-    const btnEdit = document.createElement("button");
-    btnEdit.className = "btn-editar";
-    btnEdit.innerText = "✏️";
-    btnEdit.onclick = () => prepararEdicaoLancamento(item);
+  datasOrdenadas.forEach(dataIso => {
+    // Formata a data para "Qua, 16/09/2026"
+    const [ano, mes, dia] = dataIso.split('-').map(Number);
+    const dataObj = new Date(ano, mes - 1, dia);
 
-    const btnDel = document.createElement("button");
-    btnDel.className = "btn-excluir";
-    btnDel.innerText = "❌";
-    btnDel.onclick = () => deleteDoc(doc(db, "lancamentos", item.id));
+    // Obtém o dia da semana abreviado (ex: "qua.") e capitaliza a primeira letra
+    let diaSemana = dataObj.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+    diaSemana = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
 
-    acoes.appendChild(btnEdit);
-    acoes.appendChild(btnDel);
-    div.appendChild(info);
-    div.appendChild(acoes);
-    container.appendChild(div);
+    const diaFmt = String(dia).padStart(2, '0');
+    const mesFmt = String(mes).padStart(2, '0');
+    const dataFormatada = `${diaSemana}, ${diaFmt}/${mesFmt}/${ano}`;
+
+    const grupoData = document.createElement("div");
+    grupoData.className = "grupo-data-extrato";
+    grupoData.style.marginTop = "15px";
+
+    const tituloData = document.createElement("h4");
+    tituloData.style.cssText = "color: #a855f7; border-bottom: 1px solid #334155; padding-bottom: 4px; margin-bottom: 8px;";
+    tituloData.innerText = dataFormatada;
+    grupoData.appendChild(tituloData);
+
+    // Renderiza cada lançamento daquela data
+    agrupadosPorData[dataIso].forEach(item => {
+      const div = document.createElement("div");
+      div.className = `item-lista ${item.tipo}`;
+      
+      const info = document.createElement("div");
+      info.innerHTML = `<strong>${item.desc}</strong> (${item.categoria})`;
+
+      const acoes = document.createElement("div");
+      acoes.innerHTML = `<strong>${item.tipo === 'receita' ? '+' : '-'} ${formatarMoeda(item.valor)}</strong>`;
+
+      const btnEdit = document.createElement("button");
+      btnEdit.className = "btn-editar";
+      btnEdit.innerText = "✏️";
+      btnEdit.onclick = () => prepararEdicaoLancamento(item);
+
+      const btnDel = document.createElement("button");
+      btnDel.className = "btn-excluir";
+      btnDel.innerText = "❌";
+      btnDel.onclick = () => deleteDoc(doc(db, "lancamentos", item.id));
+
+      acoes.appendChild(btnEdit);
+      acoes.appendChild(btnDel);
+      div.appendChild(info);
+      div.appendChild(acoes);
+      grupoData.appendChild(div);
+    });
+
+    container.appendChild(grupoData);
   });
 }
 
