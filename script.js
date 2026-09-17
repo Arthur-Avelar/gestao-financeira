@@ -100,7 +100,6 @@ onSnapshot(collection(db, "categorias"), (snapshot) => {
 
 onSnapshot(collection(db, "entradasFuturas"), (snapshot) => {
   entradasFuturas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  renderizarFuturos();
   atualizarTudo();
 });
 
@@ -114,6 +113,7 @@ function atualizarTudo() {
   renderizarExtrato();
   renderizarFixas();
   renderizarCartao();
+  renderizarFuturos(); // <--- Adicione esta linha
   renderizarSeparados();
 }
 
@@ -126,19 +126,23 @@ function atualizarResumo() {
   
   const saldoAtual = entradas - saidas;
 
-  const totalFuturos = entradasFuturas.filter(f => f.data && f.data.startsWith(mesSelecionado))
-    .reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
+const totalFuturos = entradasFuturas.filter(f => {
+    return f.mes === mesSelecionado || (f.data && f.data.startsWith(mesSelecionado));
+  }).reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
 
   // Filtra os separados ativos do mês atual
   const separado = valoresSeparados
     .filter(s => s.ativa !== false && (!s.mes || s.mes === mesSelecionado))
     .reduce((acc, s) => acc + (parseFloat(s.valor) || 0), 0);
 
-  const fixasPendentes = contasFixas.filter(f => {
+const fixasPendentes = contasFixas.filter(f => {
     const isAtiva = f.ativa !== false;
+    const jaCriada = !f.mesInicio || f.mesInicio <= mesSelecionado;
+    const naoEncerrada = !f.mesFim || f.mesFim > mesSelecionado;
     const mesesPagos = f.mesesPagos || [];
     const jaPaga = mesesPagos.includes(mesSelecionado);
-    return isAtiva && !jaPaga;
+
+    return isAtiva && jaCriada && naoEncerrada && !jaPaga;
   }).reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
 
   const quantoPossoGastar = (saldoAtual + totalFuturos) - separado - fixasPendentes;
@@ -495,15 +499,35 @@ document.getElementById("form-futuro").addEventListener("submit", async (e) => {
   const valor = parseFloat(document.getElementById("futuro-valor").value);
   const data = document.getElementById("futuro-data").value;
 
-  await addDoc(collection(db, "entradasFuturas"), { desc, valor, data });
+  if (!desc || isNaN(valor)) return;
+
+  // Salva a entrada atrelada ao MÊS SELECIONADO
+  await addDoc(collection(db, "entradasFuturas"), { 
+    desc, 
+    valor, 
+    data: data || `${mesSelecionado}-01`,
+    mes: mesSelecionado
+  });
+
   document.getElementById("form-futuro").reset();
 });
 
 function renderizarFuturos() {
   const container = document.getElementById("lista-futuros");
+  if (!container) return;
   container.innerHTML = "";
 
-  const ordenados = [...entradasFuturas].sort((a,b) => new Date(a.data) - new Date(b.data));
+  // Filtra estritamente os lançamentos pertencentes ao mês selecionado
+  const futurosDoMes = entradasFuturas.filter(f => {
+    return f.mes === mesSelecionado || (f.data && f.data.startsWith(mesSelecionado));
+  });
+
+  if (futurosDoMes.length === 0) {
+    container.innerHTML = "<small>Nenhum lançamento a receber neste mês.</small>";
+    return;
+  }
+
+  const ordenados = [...futurosDoMes].sort((a, b) => new Date(a.data) - new Date(b.data));
 
   ordenados.forEach(item => {
     const div = document.createElement("div");
@@ -514,24 +538,31 @@ function renderizarFuturos() {
 
     const acoes = document.createElement("div");
 
+    // Botão Receber: Adiciona no extrato/lançamentos e remove do futuros do mês
     const btnReceber = document.createElement("button");
     btnReceber.className = "btn-primary";
     btnReceber.innerText = "✅ Receber";
+    btnReceber.style.marginRight = "8px";
     btnReceber.onclick = async () => {
       await addDoc(collection(db, "lancamentos"), {
         desc: `[Depósito] ${item.desc}`,
         valor: parseFloat(item.valor),
         tipo: "receita",
         categoria: "Receita",
-        data: item.data
+        data: item.data || `${mesSelecionado}-01`
       });
       await deleteDoc(doc(db, "entradasFuturas", item.id));
     };
 
+    // Botão Excluir: Apaga APENAS o registro deste mês no banco de dados
     const btnDel = document.createElement("button");
     btnDel.className = "btn-excluir";
     btnDel.innerText = "❌";
-    btnDel.onclick = () => deleteDoc(doc(db, "entradasFuturas", item.id));
+    btnDel.onclick = async () => {
+      if (confirm(`Deseja excluir "${item.desc}" de ${formatarMesExibicao(mesSelecionado)}?`)) {
+        await deleteDoc(doc(db, "entradasFuturas", item.id));
+      }
+    };
 
     acoes.appendChild(btnReceber);
     acoes.appendChild(btnDel);
@@ -541,19 +572,20 @@ function renderizarFuturos() {
   });
 }
 
-// --- CONTAS FIXAS (COM SUPORTE A DESATIVAR/EXCLUIR) ---
+// --- CONTAS FIXAS ---
 document.getElementById("form-fixa")?.addEventListener("submit", async (e) => {
   e.preventDefault();
   const nome = document.getElementById("fixa-nome").value;
   const valor = parseFloat(document.getElementById("fixa-valor").value);
   const vencimento = parseInt(document.getElementById("fixa-vencimento").value);
 
-  // Criamos a conta marcada como ativa (ativa: true)
+  // Registra o mês em que a conta foi cadastrada
   await addDoc(collection(db, "contasFixas"), { 
     nome, 
     valor, 
     vencimento, 
     mesesPagos: [],
+    mesInicio: mesSelecionado,
     ativa: true 
   });
   document.getElementById("form-fixa").reset();
@@ -564,11 +596,15 @@ function renderizarFixas() {
   if (!container) return;
   container.innerHTML = "";
 
-  // Filtra apenas as contas que estão ATIVAS OU que já foram pagas neste mês específico
+  // Exibe a conta APENAS se o mês selecionado for igual ou posterior ao mês de criação (mesInicio)
+  // E se a conta não tiver sido desativada para este mês
   const fixasVisiveis = contasFixas.filter(f => {
-    const isAtiva = f.ativa !== false; // Se não tiver a propriedade, considera ativa
+    const isAtiva = f.ativa !== false;
+    const jaCriada = !f.mesInicio || f.mesInicio <= mesSelecionado;
+    const naoEncerrada = !f.mesFim || f.mesFim > mesSelecionado;
     const jaPagaNesteMes = (f.mesesPagos || []).includes(mesSelecionado);
-    return isAtiva || jaPagaNesteMes;
+
+    return (isAtiva && jaCriada && naoEncerrada) || jaPagaNesteMes;
   });
 
   const totalGeral = fixasVisiveis.reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
@@ -591,6 +627,11 @@ function renderizarFixas() {
   if (elPag) elPag.innerText = formatarMoeda(totalPago);
   if (elPagQtd) elPagQtd.innerText = `${pagasArr.length} pagas`;
 
+  if (fixasVisiveis.length === 0) {
+    container.innerHTML = "<small>Nenhuma conta fixa cadastrada para este mês.</small>";
+    return;
+  }
+
   fixasVisiveis.sort((a,b) => a.vencimento - b.vencimento).forEach(item => {
     const mesesPagos = item.mesesPagos || [];
     const estaPagaNesteMes = mesesPagos.includes(mesSelecionado);
@@ -605,6 +646,7 @@ function renderizarFixas() {
     const btnPagar = document.createElement("button");
     btnPagar.className = "btn-primary";
     btnPagar.innerText = estaPagaNesteMes ? 'Desmarcar' : 'Pagar';
+    btnPagar.style.marginRight = "8px";
     
     btnPagar.onclick = async () => {
       let novosMeses = [...mesesPagos];
@@ -624,14 +666,15 @@ function renderizarFixas() {
       await updateDoc(doc(db, "contasFixas", item.id), { mesesPagos: novosMeses });
     };
 
-    // Botão de Encerrar/Desativar para meses futuros
+    // Botão de Encerrar/Desativar
     const btnEncerrar = document.createElement("button");
     btnEncerrar.className = "btn-excluir";
-    btnEncerrar.innerText = "🚫";
-    btnEncerrar.title = "Encerrar conta (não aparecerá nos próximos meses)";
+    btnEncerrar.innerText = "❌";
+    btnEncerrar.title = "Remover conta";
     btnEncerrar.onclick = async () => {
-      if (confirm(`Deseja encerrar a conta "${item.nome}"? Ela deixará de aparecer nos próximos meses, mas o histórico passado será mantido.`)) {
-        await updateDoc(doc(db, "contasFixas", item.id), { ativa: false });
+      if (confirm(`Deseja remover a conta "${item.nome}" de ${formatarMesExibicao(mesSelecionado)} em diante?`)) {
+        // Marca o mês final sem apagar os meses anteriores do histórico
+        await updateDoc(doc(db, "contasFixas", item.id), { mesFim: mesSelecionado });
       }
     };
 
