@@ -117,24 +117,23 @@ function atualizarTudo() {
   renderizarSeparados();
 }
 
-// --- RESUMO & QUANTO POSSO GASTAR (FORMULA SOLICITADA) ---
+// --- RESUMO & QUANTO POSSO GASTAR ---
 function atualizarResumo() {
   const lancamentosDoMes = lancamentos.filter(l => l.data && l.data.startsWith(mesSelecionado));
 
   const entradas = lancamentosDoMes.filter(l => l.tipo === "receita").reduce((acc, l) => acc + (parseFloat(l.valor) || 0), 0);
   const saidas = lancamentosDoMes.filter(l => l.tipo === "despesa").reduce((acc, l) => acc + (parseFloat(l.valor) || 0), 0);
   
-  // Saldo em Conta (Entradas - Saídas)
   const saldoAtual = entradas - saidas;
 
-  // A Receber (Entradas Futuras do mês)
   const totalFuturos = entradasFuturas.filter(f => f.data && f.data.startsWith(mesSelecionado))
     .reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
 
-  // Total Separado
-  const separado = valoresSeparados.reduce((acc, s) => acc + (parseFloat(s.valor) || 0), 0);
+  // Filtra os separados ativos do mês atual
+  const separado = valoresSeparados
+    .filter(s => s.ativa !== false && (!s.mes || s.mes === mesSelecionado))
+    .reduce((acc, s) => acc + (parseFloat(s.valor) || 0), 0);
 
-  // Contas Fixas Pendentes no mês (Apenas as que ainda não foram pagas)
   const fixasPendentes = contasFixas.filter(f => {
     const isAtiva = f.ativa !== false;
     const mesesPagos = f.mesesPagos || [];
@@ -142,7 +141,6 @@ function atualizarResumo() {
     return isAtiva && !jaPaga;
   }).reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
 
-  // FÓRMULA SOLICITADA: (SALDO + A RECEBER) - TOTAL SEPARADO - CONTAS FIXAS
   const quantoPossoGastar = (saldoAtual + totalFuturos) - separado - fixasPendentes;
 
   const elGastar = document.getElementById("quanto-posso-gastar");
@@ -645,7 +643,7 @@ function renderizarFixas() {
   });
 }
 
-// --- VALORES SEPARADOS / OBJETIVOS ---
+// --- VALORES SEPARADOS / OBJETIVOS (ISOLADOS POR MÊS) ---
 document.getElementById("form-separado")?.addEventListener("submit", async (e) => {
   e.preventDefault();
   const nomeInput = document.getElementById("separado-nome");
@@ -656,7 +654,13 @@ document.getElementById("form-separado")?.addEventListener("submit", async (e) =
 
   if (!nome || isNaN(valor)) return;
 
-  await addDoc(collection(db, "valoresSeparados"), { nome, valor });
+  // Salva gravando o mês selecionado
+  await addDoc(collection(db, "valoresSeparados"), { 
+    nome, 
+    valor, 
+    mes: mesSelecionado,
+    ativa: true 
+  });
   document.getElementById("form-separado").reset();
 });
 
@@ -665,12 +669,19 @@ function renderizarSeparados() {
   if (!container) return;
   container.innerHTML = "";
 
-  if (valoresSeparados.length === 0) {
-    container.innerHTML = "<small>Nenhum valor separado/reservado cadastrado.</small>";
+  // Exibe apenas os itens ativos que pertencem ao mês selecionado (ou legados sem o campo 'mes')
+  const separadosDoMes = valoresSeparados.filter(s => {
+    const isAtivo = s.ativa !== false;
+    const pertenceAoMes = !s.mes || s.mes === mesSelecionado;
+    return isAtivo && pertenceAoMes;
+  });
+
+  if (separadosDoMes.length === 0) {
+    container.innerHTML = "<small>Nenhum valor separado/reservado para este mês.</small>";
     return;
   }
 
-  valoresSeparados.forEach(item => {
+  separadosDoMes.forEach(item => {
     const divItem = document.createElement("div");
     divItem.className = "item-lista";
 
@@ -686,10 +697,10 @@ function renderizarSeparados() {
     btnEdit.style.marginRight = "8px";
     btnEdit.onclick = async () => {
       const novoNome = prompt("Novo nome do objetivo:", item.nome);
-      if (novoNome === null) return; // Cancelou
+      if (novoNome === null) return;
 
       const novoValorStr = prompt("Novo valor reservado (R$):", item.valor);
-      if (novoValorStr === null) return; // Cancelou
+      if (novoValorStr === null) return;
 
       const novoValor = parseFloat(novoValorStr.replace(',', '.'));
       if (!isNaN(novoValor)) {
@@ -702,13 +713,13 @@ function renderizarSeparados() {
       }
     };
 
-    // Botão Excluir
+    // Botão Remover (Desativa mantendo histórico em outros meses)
     const btnDel = document.createElement("button");
     btnDel.className = "btn-excluir";
     btnDel.innerText = "❌";
     btnDel.onclick = async () => {
-      if (confirm(`Deseja remover o item "${item.nome}" dos Separados?`)) {
-        await deleteDoc(doc(db, "valoresSeparados", item.id));
+      if (confirm(`Deseja remover "${item.nome}" dos Separados deste mês?`)) {
+        await updateDoc(doc(db, "valoresSeparados", item.id), { ativa: false });
       }
     };
 
@@ -759,4 +770,3 @@ document.getElementById("calc-eq").addEventListener("click", () => {
 
 // Inicialização da interface do mês ao carregar
 atualizarInterfaceSeletorMes();
- 
