@@ -126,7 +126,8 @@ function atualizarResumo() {
   
   const saldoAtual = entradas - saidas;
 
-const totalFuturos = entradasFuturas.filter(f => {
+  // Filtra as entradas futuras do mês selecionado
+  const totalFuturos = entradasFuturas.filter(f => {
     return f.mes === mesSelecionado || (f.data && f.data.startsWith(mesSelecionado));
   }).reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
 
@@ -135,7 +136,8 @@ const totalFuturos = entradasFuturas.filter(f => {
     .filter(s => s.ativa !== false && (!s.mes || s.mes === mesSelecionado))
     .reduce((acc, s) => acc + (parseFloat(s.valor) || 0), 0);
 
-const fixasPendentes = contasFixas.filter(f => {
+  // Filtra as contas fixas pendentes do mês atual
+  const fixasPendentes = contasFixas.filter(f => {
     const isAtiva = f.ativa !== false;
     const jaCriada = !f.mesInicio || f.mesInicio <= mesSelecionado;
     const naoEncerrada = !f.mesFim || f.mesFim > mesSelecionado;
@@ -145,7 +147,21 @@ const fixasPendentes = contasFixas.filter(f => {
     return isAtiva && jaCriada && naoEncerrada && !jaPaga;
   }).reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
 
-  const quantoPossoGastar = (saldoAtual + totalFuturos) - separado - fixasPendentes;
+  // --- NOVO: Cálculo da Fatura do Cartão Pendente ---
+  const jaPagoCartao = lancamentos.some(l => 
+    l.categoria === "Cartão de Crédito" && 
+    l.desc.includes(formatarMesExibicao(mesSelecionado)) &&
+    l.data.startsWith(mesSelecionado)
+  );
+
+  let faturaCartaoPendente = 0;
+  if (!jaPagoCartao) {
+    const parcelas = calcularParcelasDoMes();
+    faturaCartaoPendente = parcelas.reduce((acc, p) => acc + p.valorParcela, 0);
+  }
+
+  // SUBTRAÇÃO ATUALIZADA: Inclui a fatura pendente do cartão
+  const quantoPossoGastar = (saldoAtual + totalFuturos) - separado - fixasPendentes - faturaCartaoPendente;
 
   const elGastar = document.getElementById("quanto-posso-gastar");
   const elSaldo = document.getElementById("saldo-total");
