@@ -41,7 +41,7 @@ function atualizarInterfaceSeletorMes() {
 }
 
 // Navegação do Mês
-document.getElementById("btn-mes-anterior").addEventListener("click", () => {
+document.getElementById("btn-mes-anterior")?.addEventListener("click", () => {
   const [ano, mes] = mesSelecionado.split('-').map(Number);
   const novaData = new Date(ano, mes - 2, 1);
   mesSelecionado = `${novaData.getFullYear()}-${String(novaData.getMonth() + 1).padStart(2, '0')}`;
@@ -49,7 +49,7 @@ document.getElementById("btn-mes-anterior").addEventListener("click", () => {
   atualizarTudo();
 });
 
-document.getElementById("btn-mes-proximo").addEventListener("click", () => {
+document.getElementById("btn-mes-proximo")?.addEventListener("click", () => {
   const [ano, mes] = mesSelecionado.split('-').map(Number);
   const novaData = new Date(ano, mes, 1);
   mesSelecionado = `${novaData.getFullYear()}-${String(novaData.getMonth() + 1).padStart(2, '0')}`;
@@ -62,18 +62,19 @@ function trocarAba(abaId, btn) {
   document.querySelectorAll('.aba-conteudo').forEach(aba => aba.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
 
-  document.getElementById(`aba-${abaId}`).classList.add('active');
-  btn.classList.add('active');
+  const alvoAba = document.getElementById(`aba-${abaId}`);
+  if (alvoAba) alvoAba.classList.add('active');
+  if (btn) btn.classList.add('active');
 }
 
-document.getElementById('btn-resumo').addEventListener('click', (e) => trocarAba('resumo', e.target));
-document.getElementById('btn-extrato').addEventListener('click', (e) => trocarAba('extrato', e.target));
-document.getElementById('btn-novo').addEventListener('click', (e) => trocarAba('novo', e.target));
-document.getElementById('btn-fixas').addEventListener('click', (e) => trocarAba('fixas', e.target));
-document.getElementById('btn-cartao').addEventListener('click', (e) => trocarAba('cartao', e.target));
-document.getElementById('btn-futuros').addEventListener('click', (e) => trocarAba('futuros', e.target));
-document.getElementById('btn-separados').addEventListener('click', (e) => trocarAba('separados', e.target));
-document.getElementById('btn-calculadora').addEventListener('click', (e) => trocarAba('calculadora', e.target));
+document.getElementById('btn-resumo')?.addEventListener('click', (e) => trocarAba('resumo', e.target));
+document.getElementById('btn-extrato')?.addEventListener('click', (e) => trocarAba('extrato', e.target));
+document.getElementById('btn-novo')?.addEventListener('click', (e) => trocarAba('novo', e.target));
+document.getElementById('btn-fixas')?.addEventListener('click', (e) => trocarAba('fixas', e.target));
+document.getElementById('btn-cartao')?.addEventListener('click', (e) => trocarAba('cartao', e.target));
+document.getElementById('btn-futuros')?.addEventListener('click', (e) => trocarAba('futuros', e.target));
+document.getElementById('btn-separados')?.addEventListener('click', (e) => trocarAba('separados', e.target));
+document.getElementById('btn-calculadora')?.addEventListener('click', (e) => trocarAba('calculadora', e.target));
 
 // --- LISTENERS FIRESTORE (Tempo Real) ---
 onSnapshot(collection(db, "lancamentos"), (snapshot) => {
@@ -113,7 +114,7 @@ function atualizarTudo() {
   renderizarExtrato();
   renderizarFixas();
   renderizarCartao();
-  renderizarFuturos(); // <--- Adicione esta linha
+  renderizarFuturos();
   renderizarSeparados();
 }
 
@@ -126,17 +127,14 @@ function atualizarResumo() {
   
   const saldoAtual = entradas - saidas;
 
-  // Filtra as entradas futuras do mês selecionado
   const totalFuturos = entradasFuturas.filter(f => {
     return f.mes === mesSelecionado || (f.data && f.data.startsWith(mesSelecionado));
   }).reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
 
-  // Filtra os separados ativos do mês atual
   const separado = valoresSeparados
     .filter(s => s.ativa !== false && (!s.mes || s.mes === mesSelecionado))
     .reduce((acc, s) => acc + (parseFloat(s.valor) || 0), 0);
 
-  // Filtra as contas fixas pendentes do mês atual
   const fixasPendentes = contasFixas.filter(f => {
     const isAtiva = f.ativa !== false;
     const jaCriada = !f.mesInicio || f.mesInicio <= mesSelecionado;
@@ -147,7 +145,6 @@ function atualizarResumo() {
     return isAtiva && jaCriada && naoEncerrada && !jaPaga;
   }).reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
 
-  // --- NOVO: Cálculo da Fatura do Cartão Pendente ---
   const jaPagoCartao = lancamentos.some(l => 
     l.categoria === "Cartão de Crédito" && 
     l.desc.includes(formatarMesExibicao(mesSelecionado)) &&
@@ -160,7 +157,6 @@ function atualizarResumo() {
     faturaCartaoPendente = parcelas.reduce((acc, p) => acc + p.valorParcela, 0);
   }
 
-  // SUBTRAÇÃO ATUALIZADA: Inclui a fatura pendente do cartão
   const quantoPossoGastar = (saldoAtual + totalFuturos) - separado - fixasPendentes - faturaCartaoPendente;
 
   const elGastar = document.getElementById("quanto-posso-gastar");
@@ -182,6 +178,7 @@ function atualizarResumo() {
 
 function renderizarResumoCategorias(lancamentosDoMes) {
   const container = document.getElementById("lista-categorias-resumo");
+  if (!container) return;
   container.innerHTML = "";
 
   const gastosPorCat = {};
@@ -209,7 +206,8 @@ function renderizarResumoCategorias(lancamentosDoMes) {
 
 // --- CATEGORIAS ---
 function renderizarDropdownCategorias() {
-  const select = document.getElementById("categoria-select");
+  const select = document.getElementById("lanc-categoria") || document.getElementById("categoria-select");
+  if (!select) return;
   select.innerHTML = "";
 
   if (categorias.length === 0) {
@@ -225,9 +223,10 @@ function renderizarDropdownCategorias() {
   });
 }
 
-document.getElementById("form-categoria").addEventListener("submit", async (e) => {
+document.getElementById("form-categoria")?.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const nome = document.getElementById("categoria-nome").value.trim();
+  const nomeInput = document.getElementById("categoria-nome");
+  const nome = nomeInput ? nomeInput.value.trim() : "";
   if (nome) {
     await addDoc(collection(db, "categorias"), { nome });
     document.getElementById("form-categoria").reset();
@@ -236,6 +235,7 @@ document.getElementById("form-categoria").addEventListener("submit", async (e) =
 
 function renderizarGerenciadorCategorias() {
   const container = document.getElementById("lista-categorias-gerenciador");
+  if (!container) return;
   container.innerHTML = "";
 
   categorias.forEach(item => {
@@ -250,7 +250,7 @@ function renderizarGerenciadorCategorias() {
   });
 }
 
-// --- EXTRATO AGRUPADO POR DATA (COM DIA DA SEMANA) ---
+// --- EXTRATO AGRUPADO POR DATA ---
 function renderizarExtrato() {
   const container = document.getElementById("lista-extrato");
   if (!container) return;
@@ -259,117 +259,178 @@ function renderizarExtrato() {
   const lancamentosDoMes = lancamentos.filter(l => l.data && l.data.startsWith(mesSelecionado));
 
   if (lancamentosDoMes.length === 0) {
-    container.innerHTML = "<small>Nenhuma transação encontrada para este mês.</small>";
+    container.innerHTML = "<small>Nenhuma transação neste mês.</small>";
     return;
   }
 
-  // Agrupa os lançamentos por data
-  const agrupadosPorData = {};
+  const agrupados = {};
   lancamentosDoMes.forEach(item => {
-    if (!agrupadosPorData[item.data]) {
-      agrupadosPorData[item.data] = [];
+    if (!agrupados[item.data]) {
+      agrupados[item.data] = [];
     }
-    agrupadosPorData[item.data].push(item);
+    agrupados[item.data].push(item);
   });
 
-  // Ordena as datas da mais recente para a mais antiga
-  const datasOrdenadas = Object.keys(agrupadosPorData).sort((a, b) => new Date(b) - new Date(a));
+  const datasOrdenadas = Object.keys(agrupados).sort((a, b) => {
+    return new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00');
+  });
 
-  datasOrdenadas.forEach(dataIso => {
-    // Formata a data para "Qua, 16/09/2026"
-    const [ano, mes, dia] = dataIso.split('-').map(Number);
-    const dataObj = new Date(ano, mes - 1, dia);
+  datasOrdenadas.forEach(data => {
+    const tituloData = document.createElement("div");
+    tituloData.className = "data-grupo-titulo";
+    tituloData.innerText = formatarDataExibicao(data);
+    container.appendChild(tituloData);
 
-    // Obtém o dia da semana abreviado (ex: "qua.") e capitaliza a primeira letra
-    let diaSemana = dataObj.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
-    diaSemana = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
+    const itensDoDia = agrupados[data];
 
-    const diaFmt = String(dia).padStart(2, '0');
-    const mesFmt = String(mes).padStart(2, '0');
-    const dataFormatada = `${diaSemana}, ${diaFmt}/${mesFmt}/${ano}`;
+    // Ordena do mais recente para o mais antigo dentro do dia
+    itensDoDia.sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
 
-    const grupoData = document.createElement("div");
-    grupoData.className = "grupo-data-extrato";
-    grupoData.style.marginTop = "15px";
-
-    const tituloData = document.createElement("h4");
-    tituloData.style.cssText = "color: #a855f7; border-bottom: 1px solid #334155; padding-bottom: 4px; margin-bottom: 8px;";
-    tituloData.innerText = dataFormatada;
-    grupoData.appendChild(tituloData);
-
-    // Renderiza cada lançamento daquela data
-    agrupadosPorData[dataIso].forEach(item => {
+    itensDoDia.forEach(item => {
       const div = document.createElement("div");
       div.className = `item-lista ${item.tipo}`;
-      
-      const info = document.createElement("div");
-      info.innerHTML = `<strong>${item.desc}</strong> (${item.categoria})`;
 
-      const acoes = document.createElement("div");
-      acoes.innerHTML = `<strong>${item.tipo === 'receita' ? '+' : '-'} ${formatarMoeda(item.valor)}</strong>`;
+      const infoDiv = document.createElement("div");
+      infoDiv.className = "item-info";
 
-      const btnEdit = document.createElement("button");
-      btnEdit.className = "btn-editar";
-      btnEdit.innerText = "✏️";
-      btnEdit.onclick = () => prepararEdicaoLancamento(item);
+      // Exibe a hora do lançamento (se existir)
+      const exibicaoHora = item.hora ? `<span style="font-size: 0.8em; color: #888; margin-right: 6px;">⏱️ ${item.hora}</span>` : '';
 
-      const btnDel = document.createElement("button");
-      btnDel.className = "btn-excluir";
-      btnDel.innerText = "❌";
-      btnDel.onclick = () => deleteDoc(doc(db, "lancamentos", item.id));
+      infoDiv.innerHTML = `
+        <strong>${item.desc || 'Sem descrição'}</strong>
+        <div>
+          ${exibicaoHora}
+          <small style="color: #aaa;">(${item.categoria || 'Geral'})</small>
+        </div>
+      `;
 
-      acoes.appendChild(btnEdit);
-      acoes.appendChild(btnDel);
-      div.appendChild(info);
-      div.appendChild(acoes);
-      grupoData.appendChild(div);
+      const acoesValorDiv = document.createElement("div");
+      acoesValorDiv.className = "item-acoes-valor";
+
+      const valorSpan = document.createElement("span");
+      valorSpan.style.fontWeight = "bold";
+      valorSpan.innerText = `${item.tipo === 'despesa' ? '-' : '+'} ${formatarMoeda(item.valor)}`;
+
+      const botoesDiv = document.createElement("div");
+      botoesDiv.className = "acoes-botoes";
+
+      const btnEditar = document.createElement("button");
+      btnEditar.className = "btn-icon";
+      btnEditar.innerText = "✏️";
+      btnEditar.onclick = () => prepararEdicaoLancamento(item);
+
+      const btnExcluir = document.createElement("button");
+      btnExcluir.className = "btn-icon";
+      btnExcluir.innerText = "❌";
+      btnExcluir.onclick = () => excluirLancamento(item.id);
+
+      botoesDiv.appendChild(btnEditar);
+      botoesDiv.appendChild(btnExcluir);
+
+      acoesValorDiv.appendChild(valorSpan);
+      acoesValorDiv.appendChild(botoesDiv);
+
+      div.appendChild(infoDiv);
+      div.appendChild(acoesValorDiv);
+
+      container.appendChild(div);
     });
-
-    container.appendChild(grupoData);
   });
 }
 
-function prepararEdicaoLancamento(item) {
-  document.getElementById("edit-lancamento-id").value = item.id;
-  document.getElementById("desc").value = item.desc === "Sem descrição" ? "" : item.desc;
-  document.getElementById("valor").value = item.valor;
-  document.getElementById("tipo").value = item.tipo;
-  document.getElementById("categoria-select").value = item.categoria;
-  document.getElementById("data").value = item.data;
+function excluirLancamento(id) {
+  if (confirm("Deseja realmente excluir este lançamento?")) {
+    deleteDoc(doc(db, "lancamentos", id));
+  }
+}
 
-  document.getElementById("titulo-form-lancamento").innerText = "Editar Lançamento";
-  document.getElementById("btn-salvar-lancamento").innerText = "Atualizar Lançamento";
-  document.getElementById("btn-cancelar-edicao").style.display = "inline-block";
+function prepararEdicaoLancamento(item) {
+  const elId = document.getElementById("edit-lancamento-id");
+  const elDesc = document.getElementById("lanc-desc") || document.getElementById("desc");
+  const elValor = document.getElementById("lanc-valor") || document.getElementById("valor");
+  const elTipo = document.getElementById("lanc-tipo") || document.getElementById("tipo");
+  const elCat = document.getElementById("lanc-categoria") || document.getElementById("categoria-select");
+  const elData = document.getElementById("lanc-data") || document.getElementById("data");
+
+  if (elId) elId.value = item.id;
+  if (elDesc) elDesc.value = item.desc === "Sem descrição" ? "" : item.desc;
+  if (elValor) elValor.value = item.valor;
+  if (elTipo) elTipo.value = item.tipo;
+  if (elCat) elCat.value = item.categoria;
+  if (elData) elData.value = item.data;
+
+  const titulo = document.getElementById("titulo-form-lancamento");
+  const btnSalvar = document.getElementById("btn-salvar-lancamento");
+  const btnCancelar = document.getElementById("btn-cancelar-edicao");
+
+  if (titulo) titulo.innerText = "Editar Lançamento";
+  if (btnSalvar) btnSalvar.innerText = "Atualizar Lançamento";
+  if (btnCancelar) btnCancelar.style.display = "inline-block";
 
   trocarAba('novo', document.getElementById('btn-novo'));
 }
 
-document.getElementById("btn-cancelar-edicao").addEventListener("click", resetarFormLancamento);
+document.getElementById("btn-cancelar-edicao")?.addEventListener("click", resetarFormLancamento);
 
 function resetarFormLancamento() {
-  document.getElementById("edit-lancamento-id").value = "";
-  document.getElementById("form-lancamento").reset();
-  document.getElementById("titulo-form-lancamento").innerText = "Novo Lançamento";
-  document.getElementById("btn-salvar-lancamento").innerText = "Salvar Lançamento";
-  document.getElementById("btn-cancelar-edicao").style.display = "none";
+  const elId = document.getElementById("edit-lancamento-id");
+  if (elId) elId.value = "";
+  
+  const form = document.getElementById("form-lancamento");
+  if (form) form.reset();
+
+  const titulo = document.getElementById("titulo-form-lancamento");
+  const btnSalvar = document.getElementById("btn-salvar-lancamento");
+  const btnCancelar = document.getElementById("btn-cancelar-edicao");
+
+  if (titulo) titulo.innerText = "Novo Lançamento";
+  if (btnSalvar) btnSalvar.innerText = "Salvar Lançamento";
+  if (btnCancelar) btnCancelar.style.display = "none";
 }
 
-document.getElementById("form-lancamento").addEventListener("submit", async (e) => {
+document.getElementById("form-lancamento")?.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const id = document.getElementById("edit-lancamento-id").value;
   
-  const descInput = document.getElementById("desc").value.trim();
-  const desc = descInput !== "" ? descInput : "Sem descrição";
+  const editId = document.getElementById("edit-lancamento-id")?.value;
+  const descInput = document.getElementById("lanc-desc") || document.getElementById("desc");
+  const valorInput = document.getElementById("lanc-valor") || document.getElementById("valor");
+  const tipoInput = document.getElementById("lanc-tipo") || document.getElementById("tipo");
+  const catInput = document.getElementById("lanc-categoria") || document.getElementById("categoria-select");
+  const dataInput = document.getElementById("lanc-data") || document.getElementById("data");
 
-  const valor = parseFloat(document.getElementById("valor").value);
-  const tipo = document.getElementById("tipo").value;
-  const categoria = document.getElementById("categoria-select").value;
-  const data = document.getElementById("data").value;
+  const desc = descInput ? descInput.value.trim() : "";
+  const valor = valorInput ? parseFloat(valorInput.value) : 0;
+  const tipo = tipoInput ? tipoInput.value : "despesa";
+  const categoria = catInput ? catInput.value : "Geral";
+  const data = dataInput && dataInput.value ? dataInput.value : `${mesSelecionado}-01`;
 
-  if (id) {
-    await updateDoc(doc(db, "lancamentos", id), { desc, valor, tipo, categoria, data });
+  if (isNaN(valor) || valor <= 0) {
+    alert("Por favor, digite um valor válido.");
+    return;
+  }
+
+  // Gera o horário no formato "14:30"
+  const agora = new Date();
+  const horaFormatada = agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+  if (editId) {
+    await updateDoc(doc(db, "lancamentos", editId), {
+      desc: desc || "Sem descrição",
+      valor,
+      tipo,
+      categoria,
+      data
+    });
   } else {
-    await addDoc(collection(db, "lancamentos"), { desc, valor, tipo, categoria, data });
+    await addDoc(collection(db, "lancamentos"), {
+      desc: desc || "Sem descrição",
+      valor,
+      tipo,
+      categoria,
+      data,
+      hora: horaFormatada,
+      criadoEm: agora.getTime()
+    });
   }
 
   resetarFormLancamento();
@@ -377,7 +438,7 @@ document.getElementById("form-lancamento").addEventListener("submit", async (e) 
 });
 
 // --- CARTÃO DE CRÉDITO ---
-document.getElementById("form-cartao").addEventListener("submit", async (e) => {
+document.getElementById("form-cartao")?.addEventListener("submit", async (e) => {
   e.preventDefault();
   const desc = document.getElementById("cartao-desc").value;
   const valor = parseFloat(document.getElementById("cartao-valor").value);
@@ -396,7 +457,6 @@ function calcularParcelasDoMes() {
     const [ano, mes, dia] = compra.data.split('-').map(Number);
     let dataPrimeiraFatura = new Date(ano, mes - 1, 1);
 
-    // Se comprou após o fechamento, joga a 1ª parcela pro mês seguinte
     if (dia >= compra.fechamento) {
       dataPrimeiraFatura.setMonth(dataPrimeiraFatura.getMonth() + 1);
     }
@@ -422,7 +482,6 @@ function calcularParcelasDoMes() {
   return parcelasDoMes;
 }
 
-// Ajuste na renderização para identificar se o mês atual já foi pago
 function renderizarCartao() {
   const container = document.getElementById("lista-cartao-mes");
   const labelRef = document.getElementById("cartao-mes-ref");
@@ -437,7 +496,6 @@ function renderizarCartao() {
   const parcelas = calcularParcelasDoMes();
   const totalFatura = parcelas.reduce((acc, p) => acc + p.valorParcela, 0);
 
-  // Verifica no Extrato se já existe um pagamento de fatura lançado para este mês
   const jaPago = lancamentos.some(l => 
     l.categoria === "Cartão de Crédito" && 
     l.desc.includes(formatarMesExibicao(mesSelecionado)) &&
@@ -446,18 +504,21 @@ function renderizarCartao() {
 
   if (jaPago) {
     totalDisplay.innerText = "R$ 0,00 (Paga)";
-    totalDisplay.style.color = "#22c55e"; // Verde para fatura paga
-    btnPagar.innerText = "Fatura Paga ✅";
-    btnPagar.disabled = true;
-    btnPagar.style.opacity = "0.6";
+    totalDisplay.style.color = "#22c55e";
+    if (btnPagar) {
+      btnPagar.innerText = "Fatura Paga ✅";
+      btnPagar.disabled = true;
+      btnPagar.style.opacity = "0.6";
+    }
     container.innerHTML = "<small style='color: #22c55e;'>A fatura deste mês já foi paga e lançada no extrato.</small>";
     return;
   }
 
-  // Restaura o botão caso a fatura não esteja paga
-  btnPagar.innerText = "Pagar Fatura";
-  btnPagar.disabled = false;
-  btnPagar.style.opacity = "1";
+  if (btnPagar) {
+    btnPagar.innerText = "Pagar Fatura";
+    btnPagar.disabled = false;
+    btnPagar.style.opacity = "1";
+  }
   totalDisplay.style.color = "#c084fc";
   totalDisplay.innerText = formatarMoeda(totalFatura);
 
@@ -486,7 +547,7 @@ function renderizarCartao() {
   });
 }
 
-document.getElementById("btn-pagar-fatura").addEventListener("click", async () => {
+document.getElementById("btn-pagar-fatura")?.addEventListener("click", async () => {
   const parcelas = calcularParcelasDoMes();
   const totalFatura = parcelas.reduce((acc, p) => acc + p.valorParcela, 0);
 
@@ -501,7 +562,8 @@ document.getElementById("btn-pagar-fatura").addEventListener("click", async () =
       valor: totalFatura,
       tipo: "despesa",
       categoria: "Cartão de Crédito",
-      data: `${mesSelecionado}-05`
+      data: `${mesSelecionado}-05`,
+      criadoEm: new Date().getTime()
     });
 
     trocarAba('extrato', document.getElementById('btn-extrato'));
@@ -509,7 +571,7 @@ document.getElementById("btn-pagar-fatura").addEventListener("click", async () =
 });
 
 // --- ENTRADAS FUTURAS ---
-document.getElementById("form-futuro").addEventListener("submit", async (e) => {
+document.getElementById("form-futuro")?.addEventListener("submit", async (e) => {
   e.preventDefault();
   const desc = document.getElementById("futuro-desc").value;
   const valor = parseFloat(document.getElementById("futuro-valor").value);
@@ -517,7 +579,6 @@ document.getElementById("form-futuro").addEventListener("submit", async (e) => {
 
   if (!desc || isNaN(valor)) return;
 
-  // Salva a entrada atrelada ao MÊS SELECIONADO
   await addDoc(collection(db, "entradasFuturas"), { 
     desc, 
     valor, 
@@ -533,7 +594,6 @@ function renderizarFuturos() {
   if (!container) return;
   container.innerHTML = "";
 
-  // Filtra estritamente os lançamentos pertencentes ao mês selecionado
   const futurosDoMes = entradasFuturas.filter(f => {
     return f.mes === mesSelecionado || (f.data && f.data.startsWith(mesSelecionado));
   });
@@ -554,7 +614,6 @@ function renderizarFuturos() {
 
     const acoes = document.createElement("div");
 
-    // Botão Receber: Adiciona no extrato/lançamentos e remove do futuros do mês
     const btnReceber = document.createElement("button");
     btnReceber.className = "btn-primary";
     btnReceber.innerText = "✅ Receber";
@@ -565,12 +624,12 @@ function renderizarFuturos() {
         valor: parseFloat(item.valor),
         tipo: "receita",
         categoria: "Receita",
-        data: item.data || `${mesSelecionado}-01`
+        data: item.data || `${mesSelecionado}-01`,
+        criadoEm: new Date().getTime()
       });
       await deleteDoc(doc(db, "entradasFuturas", item.id));
     };
 
-    // Botão Excluir: Apaga APENAS o registro deste mês no banco de dados
     const btnDel = document.createElement("button");
     btnDel.className = "btn-excluir";
     btnDel.innerText = "❌";
@@ -595,7 +654,6 @@ document.getElementById("form-fixa")?.addEventListener("submit", async (e) => {
   const valor = parseFloat(document.getElementById("fixa-valor").value);
   const vencimento = parseInt(document.getElementById("fixa-vencimento").value);
 
-  // Registra o mês em que a conta foi cadastrada
   await addDoc(collection(db, "contasFixas"), { 
     nome, 
     valor, 
@@ -612,8 +670,6 @@ function renderizarFixas() {
   if (!container) return;
   container.innerHTML = "";
 
-  // Exibe a conta APENAS se o mês selecionado for igual ou posterior ao mês de criação (mesInicio)
-  // E se a conta não tiver sido desativada para este mês
   const fixasVisiveis = contasFixas.filter(f => {
     const isAtiva = f.ativa !== false;
     const jaCriada = !f.mesInicio || f.mesInicio <= mesSelecionado;
@@ -676,20 +732,19 @@ function renderizarFixas() {
           valor: parseFloat(item.valor),
           tipo: "despesa",
           categoria: "Contas Fixas",
-          data: `${mesSelecionado}-${diaVenc}`
+          data: `${mesSelecionado}-${diaVenc}`,
+          criadoEm: new Date().getTime()
         });
       }
       await updateDoc(doc(db, "contasFixas", item.id), { mesesPagos: novosMeses });
     };
 
-    // Botão de Encerrar/Desativar
     const btnEncerrar = document.createElement("button");
     btnEncerrar.className = "btn-excluir";
     btnEncerrar.innerText = "❌";
     btnEncerrar.title = "Remover conta";
     btnEncerrar.onclick = async () => {
       if (confirm(`Deseja remover a conta "${item.nome}" de ${formatarMesExibicao(mesSelecionado)} em diante?`)) {
-        // Marca o mês final sem apagar os meses anteriores do histórico
         await updateDoc(doc(db, "contasFixas", item.id), { mesFim: mesSelecionado });
       }
     };
@@ -702,7 +757,7 @@ function renderizarFixas() {
   });
 }
 
-// --- VALORES SEPARADOS / OBJETIVOS (ISOLADOS POR MÊS) ---
+// --- VALORES SEPARADOS ---
 document.getElementById("form-separado")?.addEventListener("submit", async (e) => {
   e.preventDefault();
   const nomeInput = document.getElementById("separado-nome");
@@ -713,7 +768,6 @@ document.getElementById("form-separado")?.addEventListener("submit", async (e) =
 
   if (!nome || isNaN(valor)) return;
 
-  // Salva gravando o mês selecionado
   await addDoc(collection(db, "valoresSeparados"), { 
     nome, 
     valor, 
@@ -728,7 +782,6 @@ function renderizarSeparados() {
   if (!container) return;
   container.innerHTML = "";
 
-  // Exibe apenas os itens ativos que pertencem ao mês selecionado (ou legados sem o campo 'mes')
   const separadosDoMes = valoresSeparados.filter(s => {
     const isAtivo = s.ativa !== false;
     const pertenceAoMes = !s.mes || s.mes === mesSelecionado;
@@ -749,7 +802,6 @@ function renderizarSeparados() {
 
     const acoes = document.createElement("div");
 
-    // Botão Editar
     const btnEdit = document.createElement("button");
     btnEdit.className = "btn-editar";
     btnEdit.innerText = "✏️";
@@ -772,7 +824,6 @@ function renderizarSeparados() {
       }
     };
 
-    // Botão Remover (Desativa mantendo histórico em outros meses)
     const btnDel = document.createElement("button");
     btnDel.className = "btn-excluir";
     btnDel.innerText = "❌";
@@ -797,35 +848,50 @@ const display = document.getElementById("calc-display");
 document.querySelectorAll(".calc-num").forEach(btn => {
   btn.addEventListener("click", () => {
     const val = btn.getAttribute("data-val");
-    if (display.value === "0" && val !== ".") {
-      calcExpressao = val;
-    } else {
-      calcExpressao += val;
+    if (display) {
+      if (display.value === "0" && val !== ".") {
+        calcExpressao = val;
+      } else {
+        calcExpressao += val;
+      }
+      display.value = calcExpressao;
     }
-    display.value = calcExpressao;
   });
 });
 
-document.getElementById("calc-c").addEventListener("click", () => {
+document.getElementById("calc-c")?.addEventListener("click", () => {
   calcExpressao = "";
-  display.value = "0";
+  if (display) display.value = "0";
 });
 
-document.getElementById("calc-back").addEventListener("click", () => {
+document.getElementById("calc-back")?.addEventListener("click", () => {
   calcExpressao = calcExpressao.slice(0, -1);
-  display.value = calcExpressao || "0";
+  if (display) display.value = calcExpressao || "0";
 });
 
-document.getElementById("calc-eq").addEventListener("click", () => {
+document.getElementById("calc-eq")?.addEventListener("click", () => {
   try {
     const res = eval(calcExpressao);
-    display.value = res;
+    if (display) display.value = res;
     calcExpressao = res.toString();
   } catch {
-    display.value = "Erro";
+    if (display) display.value = "Erro";
     calcExpressao = "";
   }
 });
 
-// Inicialização da interface do mês ao carregar
+// Helper de exibição da data
+function formatarDataExibicao(dataStr) {
+  if (!dataStr) return "";
+  const [ano, mes, dia] = dataStr.split("-");
+  const data = new Date(ano, mes - 1, dia);
+  return data.toLocaleDateString("pt-BR", { 
+    weekday: "short", 
+    day: "2-digit", 
+    month: "2-digit", 
+    year: "numeric" 
+  });
+}
+
+// Inicialização
 atualizarInterfaceSeletorMes();
