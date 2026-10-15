@@ -283,7 +283,6 @@ function renderizarExtrato() {
 
     const itensDoDia = agrupados[data];
 
-    // Ordena do mais recente para o mais antigo dentro do dia
     itensDoDia.sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
 
     itensDoDia.forEach(item => {
@@ -293,7 +292,6 @@ function renderizarExtrato() {
       const infoDiv = document.createElement("div");
       infoDiv.className = "item-info";
 
-      // Exibe a hora do lançamento (se existir)
       const exibicaoHora = item.hora ? `<span style="font-size: 0.8em; color: #888; margin-right: 6px;">⏱️ ${item.hora}</span>` : '';
 
       infoDiv.innerHTML = `
@@ -409,7 +407,6 @@ document.getElementById("form-lancamento")?.addEventListener("submit", async (e)
     return;
   }
 
-  // Gera o horário no formato "14:30"
   const agora = new Date();
   const horaFormatada = agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
@@ -630,6 +627,29 @@ function renderizarFuturos() {
       await deleteDoc(doc(db, "entradasFuturas", item.id));
     };
 
+    // BOTÃO EDITAR ENTRADA FUTURA
+    const btnEdit = document.createElement("button");
+    btnEdit.className = "btn-editar";
+    btnEdit.innerText = "✏️";
+    btnEdit.style.marginRight = "8px";
+    btnEdit.onclick = async () => {
+      const novaDesc = prompt("Nova descrição:", item.desc);
+      if (novaDesc === null) return;
+
+      const novoValorStr = prompt("Novo valor (R$):", item.valor);
+      if (novoValorStr === null) return;
+
+      const novoValor = parseFloat(novoValorStr.replace(',', '.'));
+      if (!isNaN(novoValor)) {
+        await updateDoc(doc(db, "entradasFuturas", item.id), { 
+          desc: novaDesc.trim() || item.desc, 
+          valor: novoValor 
+        });
+      } else {
+        alert("Valor inválido inserido.");
+      }
+    };
+
     const btnDel = document.createElement("button");
     btnDel.className = "btn-excluir";
     btnDel.innerText = "❌";
@@ -640,6 +660,7 @@ function renderizarFuturos() {
     };
 
     acoes.appendChild(btnReceber);
+    acoes.appendChild(btnEdit);
     acoes.appendChild(btnDel);
     div.appendChild(info);
     div.appendChild(acoes);
@@ -739,6 +760,29 @@ function renderizarFixas() {
       await updateDoc(doc(db, "contasFixas", item.id), { mesesPagos: novosMeses });
     };
 
+    // BOTÃO EDITAR CONTA FIXA
+    const btnEdit = document.createElement("button");
+    btnEdit.className = "btn-editar";
+    btnEdit.innerText = "✏️";
+    btnEdit.style.marginRight = "8px";
+    btnEdit.onclick = async () => {
+      const novoNome = prompt("Novo nome da conta fixa:", item.nome);
+      if (novoNome === null) return;
+
+      const novoValorStr = prompt("Novo valor (R$):", item.valor);
+      if (novoValorStr === null) return;
+
+      const novoValor = parseFloat(novoValorStr.replace(',', '.'));
+      if (!isNaN(novoValor)) {
+        await updateDoc(doc(db, "contasFixas", item.id), { 
+          nome: novoNome.trim() || item.nome, 
+          valor: novoValor 
+        });
+      } else {
+        alert("Valor inválido inserido.");
+      }
+    };
+
     const btnEncerrar = document.createElement("button");
     btnEncerrar.className = "btn-excluir";
     btnEncerrar.innerText = "❌";
@@ -750,6 +794,7 @@ function renderizarFixas() {
     };
 
     acoes.appendChild(btnPagar);
+    acoes.appendChild(btnEdit);
     acoes.appendChild(btnEncerrar);
     div.appendChild(info);
     div.appendChild(acoes);
