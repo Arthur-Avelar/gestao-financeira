@@ -129,7 +129,11 @@ function atualizarResumo() {
 
   const totalFuturos = entradasFuturas.filter(f => {
     return f.mes === mesSelecionado || (f.data && f.data.startsWith(mesSelecionado));
-  }).reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
+  }).reduce((acc, f) => {
+    const custom = f.edicoesPorMes && f.edicoesPorMes[mesSelecionado];
+    const valorReal = custom && custom.valor !== undefined ? custom.valor : f.valor;
+    return acc + (parseFloat(valorReal) || 0);
+  }, 0);
 
   const separado = valoresSeparados
     .filter(s => s.ativa !== false && (!s.mes || s.mes === mesSelecionado))
@@ -143,7 +147,11 @@ function atualizarResumo() {
     const jaPaga = mesesPagos.includes(mesSelecionado);
 
     return isAtiva && jaCriada && naoEncerrada && !jaPaga;
-  }).reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
+  }).reduce((acc, f) => {
+    const custom = f.edicoesPorMes && f.edicoesPorMes[mesSelecionado];
+    const valorReal = custom && custom.valor !== undefined ? custom.valor : f.valor;
+    return acc + (parseFloat(valorReal) || 0);
+  }, 0);
 
   const jaPagoCartao = lancamentos.some(l => 
     l.categoria === "Cartão de Crédito" && 
@@ -580,7 +588,8 @@ document.getElementById("form-futuro")?.addEventListener("submit", async (e) => 
     desc, 
     valor, 
     data: data || `${mesSelecionado}-01`,
-    mes: mesSelecionado
+    mes: mesSelecionado,
+    edicoesPorMes: {}
   });
 
   document.getElementById("form-futuro").reset();
@@ -603,11 +612,15 @@ function renderizarFuturos() {
   const ordenados = [...futurosDoMes].sort((a, b) => new Date(a.data) - new Date(b.data));
 
   ordenados.forEach(item => {
+    const custom = item.edicoesPorMes && item.edicoesPorMes[mesSelecionado];
+    const descExibicao = custom && custom.desc !== undefined ? custom.desc : item.desc;
+    const valorExibicao = custom && custom.valor !== undefined ? custom.valor : item.valor;
+
     const div = document.createElement("div");
     div.className = "item-lista receita";
 
     const info = document.createElement("div");
-    info.innerHTML = `<strong>${item.desc}</strong><br><small>Previsto: ${item.data}</small><br><span>${formatarMoeda(item.valor)}</span>`;
+    info.innerHTML = `<strong>${descExibicao}</strong><br><small>Previsto: ${item.data}</small><br><span>${formatarMoeda(valorExibicao)}</span>`;
 
     const acoes = document.createElement("div");
 
@@ -617,8 +630,8 @@ function renderizarFuturos() {
     btnReceber.style.marginRight = "8px";
     btnReceber.onclick = async () => {
       await addDoc(collection(db, "lancamentos"), {
-        desc: `[Depósito] ${item.desc}`,
-        valor: parseFloat(item.valor),
+        desc: `[Depósito] ${descExibicao}`,
+        valor: parseFloat(valorExibicao),
         tipo: "receita",
         categoria: "Receita",
         data: item.data || `${mesSelecionado}-01`,
@@ -627,23 +640,28 @@ function renderizarFuturos() {
       await deleteDoc(doc(db, "entradasFuturas", item.id));
     };
 
-    // BOTÃO EDITAR ENTRADA FUTURA
+    // BOTÃO EDITAR ENTRADA FUTURA (EXCLUSIVO PARA O MÊS ATUAL)
     const btnEdit = document.createElement("button");
     btnEdit.className = "btn-editar";
     btnEdit.innerText = "✏️";
     btnEdit.style.marginRight = "8px";
     btnEdit.onclick = async () => {
-      const novaDesc = prompt("Nova descrição:", item.desc);
+      const novaDesc = prompt(`Nova descrição para ${formatarMesExibicao(mesSelecionado)}:`, descExibicao);
       if (novaDesc === null) return;
 
-      const novoValorStr = prompt("Novo valor (R$):", item.valor);
+      const novoValorStr = prompt(`Novo valor (R$) para ${formatarMesExibicao(mesSelecionado)}:`, valorExibicao);
       if (novoValorStr === null) return;
 
       const novoValor = parseFloat(novoValorStr.replace(',', '.'));
       if (!isNaN(novoValor)) {
+        const edicoesAtuais = item.edicoesPorMes || {};
+        edicoesAtuais[mesSelecionado] = {
+          desc: novaDesc.trim() || descExibicao,
+          valor: novoValor
+        };
+
         await updateDoc(doc(db, "entradasFuturas", item.id), { 
-          desc: novaDesc.trim() || item.desc, 
-          valor: novoValor 
+          edicoesPorMes: edicoesAtuais
         });
       } else {
         alert("Valor inválido inserido.");
@@ -654,7 +672,7 @@ function renderizarFuturos() {
     btnDel.className = "btn-excluir";
     btnDel.innerText = "❌";
     btnDel.onclick = async () => {
-      if (confirm(`Deseja excluir "${item.desc}" de ${formatarMesExibicao(mesSelecionado)}?`)) {
+      if (confirm(`Deseja excluir "${descExibicao}" de ${formatarMesExibicao(mesSelecionado)}?`)) {
         await deleteDoc(doc(db, "entradasFuturas", item.id));
       }
     };
@@ -681,6 +699,7 @@ document.getElementById("form-fixa")?.addEventListener("submit", async (e) => {
     vencimento, 
     mesesPagos: [],
     mesInicio: mesSelecionado,
+    edicoesPorMes: {},
     ativa: true 
   });
   document.getElementById("form-fixa").reset();
@@ -700,11 +719,25 @@ function renderizarFixas() {
     return (isAtiva && jaCriada && naoEncerrada) || jaPagaNesteMes;
   });
 
-  const totalGeral = fixasVisiveis.reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
+  const totalGeral = fixasVisiveis.reduce((acc, f) => {
+    const custom = f.edicoesPorMes && f.edicoesPorMes[mesSelecionado];
+    const val = custom && custom.valor !== undefined ? custom.valor : f.valor;
+    return acc + (parseFloat(val) || 0);
+  }, 0);
+
   const pendentesArr = fixasVisiveis.filter(f => !(f.mesesPagos || []).includes(mesSelecionado));
-  const totalPendente = pendentesArr.reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
+  const totalPendente = pendentesArr.reduce((acc, f) => {
+    const custom = f.edicoesPorMes && f.edicoesPorMes[mesSelecionado];
+    const val = custom && custom.valor !== undefined ? custom.valor : f.valor;
+    return acc + (parseFloat(val) || 0);
+  }, 0);
+
   const pagasArr = fixasVisiveis.filter(f => (f.mesesPagos || []).includes(mesSelecionado));
-  const totalPago = pagasArr.reduce((acc, f) => acc + (parseFloat(f.valor) || 0), 0);
+  const totalPago = pagasArr.reduce((acc, f) => {
+    const custom = f.edicoesPorMes && f.edicoesPorMes[mesSelecionado];
+    const val = custom && custom.valor !== undefined ? custom.valor : f.valor;
+    return acc + (parseFloat(val) || 0);
+  }, 0);
 
   const elVal = document.getElementById("total-fixas-valor");
   const elQtd = document.getElementById("total-fixas-qtd");
@@ -726,6 +759,10 @@ function renderizarFixas() {
   }
 
   fixasVisiveis.sort((a,b) => a.vencimento - b.vencimento).forEach(item => {
+    const custom = item.edicoesPorMes && item.edicoesPorMes[mesSelecionado];
+    const nomeExibicao = custom && custom.nome !== undefined ? custom.nome : item.nome;
+    const valorExibicao = custom && custom.valor !== undefined ? custom.valor : item.valor;
+
     const mesesPagos = item.mesesPagos || [];
     const estaPagaNesteMes = mesesPagos.includes(mesSelecionado);
 
@@ -733,7 +770,7 @@ function renderizarFixas() {
     div.className = `item-lista ${estaPagaNesteMes ? 'item-pago' : ''}`;
 
     const info = document.createElement("div");
-    info.innerHTML = `<strong>${item.nome}</strong> - Vence dia ${item.vencimento}<br><span>${formatarMoeda(item.valor)}</span>`;
+    info.innerHTML = `<strong>${nomeExibicao}</strong> - Vence dia ${item.vencimento}<br><span>${formatarMoeda(valorExibicao)}</span>`;
 
     const acoes = document.createElement("div");
     const btnPagar = document.createElement("button");
@@ -749,8 +786,8 @@ function renderizarFixas() {
         novosMeses.push(mesSelecionado);
         const diaVenc = String(item.vencimento).padStart(2, '0');
         await addDoc(collection(db, "lancamentos"), {
-          desc: `[Conta Fixa] ${item.nome}`,
-          valor: parseFloat(item.valor),
+          desc: `[Conta Fixa] ${nomeExibicao}`,
+          valor: parseFloat(valorExibicao),
           tipo: "despesa",
           categoria: "Contas Fixas",
           data: `${mesSelecionado}-${diaVenc}`,
@@ -760,23 +797,28 @@ function renderizarFixas() {
       await updateDoc(doc(db, "contasFixas", item.id), { mesesPagos: novosMeses });
     };
 
-    // BOTÃO EDITAR CONTA FIXA
+    // BOTÃO EDITAR CONTA FIXA (EXCLUSIVO PARA O MÊS ATUAL)
     const btnEdit = document.createElement("button");
     btnEdit.className = "btn-editar";
     btnEdit.innerText = "✏️";
     btnEdit.style.marginRight = "8px";
     btnEdit.onclick = async () => {
-      const novoNome = prompt("Novo nome da conta fixa:", item.nome);
+      const novoNome = prompt(`Novo nome da conta para ${formatarMesExibicao(mesSelecionado)}:`, nomeExibicao);
       if (novoNome === null) return;
 
-      const novoValorStr = prompt("Novo valor (R$):", item.valor);
+      const novoValorStr = prompt(`Novo valor (R$) para ${formatarMesExibicao(mesSelecionado)}:`, valorExibicao);
       if (novoValorStr === null) return;
 
       const novoValor = parseFloat(novoValorStr.replace(',', '.'));
       if (!isNaN(novoValor)) {
+        const edicoesAtuais = item.edicoesPorMes || {};
+        edicoesAtuais[mesSelecionado] = {
+          nome: novoNome.trim() || nomeExibicao,
+          valor: novoValor
+        };
+
         await updateDoc(doc(db, "contasFixas", item.id), { 
-          nome: novoNome.trim() || item.nome, 
-          valor: novoValor 
+          edicoesPorMes: edicoesAtuais
         });
       } else {
         alert("Valor inválido inserido.");
@@ -788,7 +830,7 @@ function renderizarFixas() {
     btnEncerrar.innerText = "❌";
     btnEncerrar.title = "Remover conta";
     btnEncerrar.onclick = async () => {
-      if (confirm(`Deseja remover a conta "${item.nome}" de ${formatarMesExibicao(mesSelecionado)} em diante?`)) {
+      if (confirm(`Deseja remover a conta "${nomeExibicao}" de ${formatarMesExibicao(mesSelecionado)} em diante?`)) {
         await updateDoc(doc(db, "contasFixas", item.id), { mesFim: mesSelecionado });
       }
     };
